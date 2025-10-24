@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Plot</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js library -->
+</head>
+<body>
+  <h1 style="text-align: center;">Moving Average Visualization</h1>
+
+  <div style="display: flex; flex-direction: row; justify-content: space-around; align-items: center;">
+    <!-- Slider -->
+    <div style="text-align: center;">
+      <label for="window-size">Window Size: <span id="window-value">3</span></label>
+      <input type="range" id="window-size" min="1" max="60" value="3" step="1" />
+    </div>
+      <!-- Slider -->
+    <div style="text-align: center;">
+      <label for="movement-threshold">Movment Threshold: <span id="threshold-value">5</span></label>
+      <input type="range" id="movement-threshold" min="1" max="20" value="5" step="1" />
+    </div>
+    <!-- Slider -->
+    <div style="text-align: center;">
+      <label for="lag-size">Lag Delta: <span id="lag-value">20</span></label>
+      <input type="range" id="lag-size" min="0" max="60" value="20" step="1" />
+    </div>
+  </div>
+
+  <!-- Movement Threshold Break Count -->
+  <div style="text-align: center; margin-top: 20px;">
+    <h2>Threshold Faults: <span id="break-count">0</span></h2>
+  </div>
+
+  <!-- Chart Canvas -->
+  <div style="width: 80%; margin: auto;">
+    <canvas id="displacementChart"></canvas>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>
