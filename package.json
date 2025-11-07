@@ -6,15 +6,15 @@
     "email": "bnc-it@brown.edu",
     "url": "https://bnc.brown.edu",
     "contributors": [
-    {
-      "name": "Michael Worden",
-      "email": "worden@brown.edu"
-    },
-    {
-      "name": "Ford McDonald",
-      "email": "ford_mcdonald@brown.edu"
-    }
-  ]
+      {
+        "name": "Michael Worden",
+        "email": "worden@brown.edu"
+      },
+      {
+        "name": "Ford McDonald",
+        "email": "ford_mcdonald@brown.edu"
+      }
+    ]
   },
   "version": "1.0.0",
   "honeycombVersion": "",
@@ -24,6 +24,7 @@
   "homepage": ".",
   "repository": "https://github.com/brown-bnc/motion-trainer",
   "dependencies": {
+    "@abandonware/noble": "^1.9.2-26",
     "@brown-ccv/behavioral-task-trials": "^2.0.0",
     "@fortawesome/fontawesome-free": "^6.4.2",
     "@jspsych/extension-mouse-tracking": "^1.0.3",

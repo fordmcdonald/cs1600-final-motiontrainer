@@ -12,10 +12,17 @@ const { getPort, sendToPort } = require("event-marker");
 
 const { SerialPort } = require("serialport");
 const deviceRegistry = require("../src/deviceRegistry");
+const BLEController = require("../src/lib/bleController");
 const { eventCodes, vendorId, productId, comName } = require("./config/trigger");
 
 // handle windows installer set up
 if (require("electron-squirrel-startup")) app.quit();
+
+// Initialize BLE Controller
+let bleController = null;
+
+let driver;
+
 
 // Define default environment variables
 let USE_EEG = false;
@@ -178,9 +185,22 @@ function createWindow() {
   }
 }
 
-let driver;
-
 async function initializeDevices(ipc) {
+  // Initialize BLE Controller
+  bleController = new BLEController();
+  
+  try {
+    const bleConnected = await bleController.initialize();
+    if (bleConnected) {
+      console.log('[Electron] BLE device connected successfully');
+    } else {
+      console.warn('[Electron] BLE device not found or connection failed');
+    }
+  } catch (err) {
+    console.error('[Electron] BLE initialization error:', err);
+  }
+
+  // Find and initialize motion tracking device
   const ports = await SerialPort.list();
 
   let driverFound = false;
@@ -196,14 +216,18 @@ async function initializeDevices(ipc) {
       selectedDevice = {port: portInfo, driver: DriverClass.name}
 
       try {
-        driver = new DriverClass(portInfo, settings, mainWindow, plotWindow);
+        // Create BLE trigger callback
+        const bleTrigger = bleController ? () => bleController.flashLED(500) : null;
+        
+        // Initialize driver with BLE callback
+        driver = new DriverClass(portInfo, settings, mainWindow, plotWindow, bleTrigger);
         driverFound = true;
 
         ipc.on("set-settings", (event, settings, config, saveToFile) => handleSetSettings(event, settings, config, saveToFile, driver));
 
         break; 
       } catch (error) {
-        console.error(`Error initializing driver for ${deviceKey}:`, error);
+        console.error(`Error initializing driver for ${path}:`, error);
       }
     }
   }
