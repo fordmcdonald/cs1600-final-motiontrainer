@@ -13,6 +13,7 @@ const { getPort, sendToPort } = require("event-marker");
 const { SerialPort } = require("serialport");
 const deviceRegistry = require("../src/deviceRegistry");
 const BLEController = require("../src/lib/bleController");
+const DeviceScanner = require("../src/lib/deviceScanner");
 const { eventCodes, vendorId, productId, comName } = require("./config/trigger");
 
 // handle windows installer set up
@@ -186,48 +187,62 @@ function createWindow() {
 }
 
 async function initializeDevices(ipc) {
-  // Initialize BLE Controller
+  // Initialize BLE LED Controller (for Arduino LED trigger)
   bleController = new BLEController();
   
   try {
     const bleConnected = await bleController.initialize();
     if (bleConnected) {
-      console.log('[Electron] BLE device connected successfully');
+      console.log('[Electron] BLE LED Controller connected successfully');
     } else {
-      console.warn('[Electron] BLE device not found or connection failed');
+      console.warn('[Electron] BLE LED Controller not found');
     }
   } catch (err) {
-    console.error('[Electron] BLE initialization error:', err);
+    console.error('[Electron] BLE LED Controller initialization error:', err);
   }
 
-  // Find and initialize motion tracking device
-  const ports = await SerialPort.list();
+  // Scan for all devices (Serial and BLE)
+  const deviceScanner = new DeviceScanner();
+  const devices = await deviceScanner.scanAll(5000);  // 5 second BLE scan
+  
+  console.log('[Electron] Device scan complete. Found devices:', devices.map(d => ({
+    type: d.type,
+    path: d.path,
+    name: d.name || d.manufacturer
+  })));
 
   let driverFound = false;
 
-  for (const portInfo of ports) {
-
-    const path = `${portInfo.path}` 
+  // Try to initialize a driver for each discovered device
+  for (const deviceInfo of devices) {
+    const path = deviceInfo.path;
 
     // Check if we have a driver for this device in the registry
     const DriverClass = deviceRegistry[path];
 
     if (DriverClass) {
-      selectedDevice = {port: portInfo, driver: DriverClass.name}
+      selectedDevice = { 
+        port: deviceInfo, 
+        driver: DriverClass.name,
+        type: deviceInfo.type 
+      };
 
       try {
         // Create BLE trigger callback
         const bleTrigger = bleController ? () => bleController.flashLED(500) : null;
         
-        // Initialize driver with BLE callback
-        driver = new DriverClass(portInfo, settings, mainWindow, plotWindow, bleTrigger);
+        console.log(`[Electron] Initializing ${DriverClass.name} for ${deviceInfo.type} device: ${path}`);
+        
+        // Initialize driver with deviceInfo (not portInfo)
+        driver = new DriverClass(deviceInfo, settings, mainWindow, plotWindow, bleTrigger);
         driverFound = true;
 
         ipc.on("set-settings", (event, settings, config, saveToFile) => handleSetSettings(event, settings, config, saveToFile, driver));
 
+        console.log(`[Electron] Successfully initialized ${DriverClass.name}`);
         break; 
       } catch (error) {
-        console.error(`Error initializing driver for ${path}:`, error);
+        console.error(`[Electron] Error initializing driver for ${path}:`, error);
       }
     }
   }

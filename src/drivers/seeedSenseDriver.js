@@ -2,9 +2,14 @@ const { SerialPort } = require("serialport");
 const BaseDriver = require("./baseDriver");
 
 class SeeedSenseDriver extends BaseDriver {
-  constructor(portInfo, settings, mainWindow, plotWindow, bleTriggerCallback) {
-    super(portInfo, settings, mainWindow, plotWindow, bleTriggerCallback);
-    // Buffer to accumulate multi-line sensor data
+  constructor(deviceInfo, settings, mainWindow, plotWindow, bleTriggerCallback) {
+    super(deviceInfo, settings, mainWindow, plotWindow, bleTriggerCallback);
+    
+    // BLE-specific properties
+    this.bleCharacteristic = null;
+    this.bleDataBuffer = '';  // Buffer for incomplete BLE packets
+    
+    // Data buffer for parsing (used by both Serial and BLE)
     this.dataBuffer = {
       accel: { x: null, y: null, z: null },
       gyro: { x: null, y: null, z: null }
@@ -13,20 +18,23 @@ class SeeedSenseDriver extends BaseDriver {
 
   parseData(data, plotWindow) {
     try {
-      // Parse Seeed Sense MCU data format:
-      // Accelerometer:
-      //  X1 = -0.1923
-      //  Y1 = -0.3714
-      //  Z1 = -0.8945
-      // Gyroscope:
-      //  X1 = -0.0700
-      //  Y1 = -3.2900
-      //  Z1 = 0.9100
-      
       const line = data.trim();
+      console.log('[SeeedSense] parseData called with:', line);
       
-      // Parse accelerometer values
-      if (line.includes('X1 =')){
+      // New BLE format: "ACC,x,y,z"
+      if (line.startsWith('ACC,')) {
+        const parts = line.split(',');
+        console.log('[SeeedSense] Parsing ACC format, parts:', parts);
+        if (parts.length === 4) {
+          this.dataBuffer.accel.x = parseFloat(parts[1]);
+          this.dataBuffer.accel.y = parseFloat(parts[2]);
+          this.dataBuffer.accel.z = parseFloat(parts[3]);
+          console.log('[SeeedSense] Parsed accel values:', this.dataBuffer.accel);
+          // For BLE format, we have complete data immediately
+        }
+      }
+      // Old Serial format: Multi-line with "X1 = value"
+      else if (line.includes('X1 =')) {
         this.dataBuffer.accel.x = parseFloat(line.split('=')[1].trim());
       } else if (line.includes('Y1 =')) {
         this.dataBuffer.accel.y = parseFloat(line.split('=')[1].trim());
@@ -34,32 +42,26 @@ class SeeedSenseDriver extends BaseDriver {
         this.dataBuffer.accel.z = parseFloat(line.split('=')[1].trim());
       }
       
-      
-      // Check if we have complete data (all accelerometer and gyroscope values)
+      // Check if we have complete data
       const hasCompleteData = 
         this.dataBuffer.accel.x !== null &&
         this.dataBuffer.accel.y !== null &&
         this.dataBuffer.accel.z !== null;
       
+      console.log('[SeeedSense] Has complete data:', hasCompleteData);
+      
       if (!hasCompleteData) {
         return { brokeThreshold: false, thresholdPct: 0 };
       }
       
-      // Log complete sensor reading
-    //   console.log("Seeed Sense Data:", {
-    //     accel: this.dataBuffer.accel,
-    //     gyro: this.dataBuffer.gyro
-    //   });
-      
-      // Combine accelerometer and gyroscope data
-      // Scale values appropriately (adjust multiplier as needed)
+      // Create position data from accelerometer readings
       const positionData = {
         type: "motion",
         // Accelerometer data (in g)
         accelX: this.dataBuffer.accel.x * 10,
         accelY: this.dataBuffer.accel.y * 10,
         accelZ: this.dataBuffer.accel.z * 10,
-        // Gyroscope data (in deg/s)
+        // Gyroscope data (in deg/s) - may be null for BLE
         gyroX: this.dataBuffer.gyro.x,
         gyroY: this.dataBuffer.gyro.y,
         gyroZ: this.dataBuffer.gyro.z,
@@ -68,6 +70,8 @@ class SeeedSenseDriver extends BaseDriver {
         y: this.dataBuffer.accel.y * 10,
         z: this.dataBuffer.accel.z * 10,
       };
+      
+      console.log('[SeeedSense] Position data created:', { x: positionData.x.toFixed(4), y: positionData.y.toFixed(4), z: positionData.z.toFixed(4) });
       
       // Reset buffer for next reading
       this.dataBuffer = {
@@ -120,22 +124,11 @@ class SeeedSenseDriver extends BaseDriver {
         deltaX ** 2 + deltaY ** 2 + deltaZ ** 2
       );
 
-      // Always log motion detection results
-    //   console.log("Motion Magnitude:", motionMagnitude.toFixed(4), {
-    //     threshold: this.tolerance,
-    //     thresholdPct: (motionMagnitude / this.tolerance * 100).toFixed(2) + '%',
-    //     accel: { 
-    //       x: positionData.accelX.toFixed(4), 
-    //       y: positionData.accelY.toFixed(4), 
-    //       z: positionData.accelZ.toFixed(4) 
-    //     }
-    //   });
-
       // Check if motion magnitude exceeds the threshold
-      console.log("Motion Mag: ", motionMagnitude.toFixed(4));
+      console.log("[SeeedSense] Motion Mag:", motionMagnitude.toFixed(4), "Threshold: 2, Current tolerance:", this.tolerance);
 
-      if (motionMagnitude > 5) {
-        console.log("BROKE THRESHOLD! Motion Mag: ", motionMagnitude.toFixed(4));
+      if (motionMagnitude > 2) {
+        console.log("[SeeedSense] ⚡ BROKE THRESHOLD! Motion Mag:", motionMagnitude.toFixed(4));
         return { brokeThreshold: true, thresholdPct: 1 }; 
       }
 
@@ -146,13 +139,117 @@ class SeeedSenseDriver extends BaseDriver {
     }
   }
 
-  initializeDevice() {
+  async initializeDevice() {
+    if (this.deviceType === 'ble') {
+      await this.initializeBLE();
+    } else {
+      this.initializeSerial();
+    }
+  }
+
+  async initializeBLE() {
     try {
+      console.log('[SeeedSense] Initializing BLE connection...');
+      const peripheral = this.deviceInfo.peripheral;
+      
+      return new Promise((resolve, reject) => {
+        peripheral.connect((err) => {
+          if (err) {
+            console.error('[SeeedSense] BLE connection error:', err);
+            return reject(err);
+          }
+          
+          console.log('[SeeedSense] Connected to', this.deviceInfo.name);
+
+          peripheral.discoverSomeServicesAndCharacteristics(
+            [this.deviceInfo.serviceUUID],
+            [this.deviceInfo.txCharUUID],
+            (err, services, characteristics) => {
+              if (err) {
+                console.error('[SeeedSense] BLE service discovery error:', err);
+                return reject(err);
+              }
+
+              this.bleCharacteristic = characteristics[0];
+              if (!this.bleCharacteristic) {
+                return reject(new Error('[SeeedSense] TX characteristic not found'));
+              }
+
+              console.log('[SeeedSense] TX characteristic found, subscribing to notifications...');
+
+              // Subscribe to notifications (incoming data)
+              this.bleCharacteristic.subscribe((err) => {
+                if (err) {
+                  console.error('[SeeedSense] Subscription error:', err);
+                  return reject(err);
+                }
+                console.log('[SeeedSense] Subscribed to accelerometer data');
+              });
+
+              // Handle incoming data
+              this.bleCharacteristic.on('data', (buffer) => {
+                const data = buffer.toString('utf8');
+                console.log('[SeeedSense] 🔵 BLE data received:', data);
+                
+                // Buffer data
+                this.bleDataBuffer += data;
+                
+                // Look for complete ACC packets (pattern: ACC,x.xxxx,y.yyyy,z.zzzz)
+                // Use regex to find all complete ACC lines
+                const accPattern = /ACC,[-\d.]+,[-\d.]+,[-\d.]+/g;
+                const matches = this.bleDataBuffer.match(accPattern);
+                
+                if (matches && matches.length > 0) {
+                  console.log('[SeeedSense] Found', matches.length, 'complete ACC packets');
+                  
+                  // Process each complete packet
+                  matches.forEach((packet) => {
+                    this.handleData(packet);
+                  });
+                  
+                  // Remove processed packets from buffer
+                  // Keep any incomplete data at the end
+                  const lastMatch = matches[matches.length - 1];
+                  const lastIndex = this.bleDataBuffer.lastIndexOf(lastMatch);
+                  this.bleDataBuffer = this.bleDataBuffer.substring(lastIndex + lastMatch.length);
+                  
+                  console.log('[SeeedSense] Buffer remainder:', this.bleDataBuffer.length, 'chars');
+                } else {
+                  console.log('[SeeedSense] No complete packets yet, buffer size:', this.bleDataBuffer.length);
+                }
+                
+                // Prevent buffer from growing too large
+                if (this.bleDataBuffer.length > 500) {
+                  console.log('[SeeedSense] ⚠️ Buffer overflow, resetting');
+                  this.bleDataBuffer = '';
+                }
+              });
+
+              resolve();
+            }
+          );
+        });
+
+        // Handle disconnect
+        peripheral.on('disconnect', () => {
+          console.log('[SeeedSense] BLE device disconnected');
+          this.bleCharacteristic = null;
+        });
+      });
+    } catch (err) {
+      console.error("[SeeedSense] Failed to initialize BLE:", err);
+      throw err;
+    }
+  }
+
+  initializeSerial() {
+    try {
+      console.log('[SeeedSense] Initializing Serial connection...');
+      
       // Initialize serial port for Seeed Sense MCU
-      // Common baud rates for Seeed devices: 9600, 115200
       this.port = new SerialPort({ 
-        path: this.portInfo.path, 
-        baudRate: 115200,  // Adjust if needed based on MCU configuration
+        path: this.deviceInfo.path, 
+        baudRate: 115200,
         dataBits: 8,
         parity: 'none',
         stopBits: 1,
@@ -161,19 +258,17 @@ class SeeedSenseDriver extends BaseDriver {
 
       // Listen for port open event
       this.port.on('open', () => {
-        console.log(`Seeed Sense MCU connected on ${this.portInfo.path}`);
-        
-        // Send any initialization commands to the MCU if needed
-        // Example: this.port.write("START\n");
+        console.log(`[SeeedSense] Serial connected on ${this.deviceInfo.path}`);
       });
 
       // Listen for port errors
       this.port.on('error', (err) => {
-        console.error('Seeed Sense MCU port error:', err);
+        console.error('[SeeedSense] Serial port error:', err);
       });
 
     } catch (err) {
-      console.error("Failed to initialize Seeed Sense MCU:", err);
+      console.error("[SeeedSense] Failed to initialize Serial:", err);
+      throw err;
     }
   }
 }

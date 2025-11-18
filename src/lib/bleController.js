@@ -33,7 +33,7 @@ class BLEController {
 
       noble.on('discover', async (peripheral) => {
         const localName = peripheral.advertisement.localName;
-        if (localName === DEVICE_NAME) {
+        if (localName === DEVICE_NAME || localName === "Arduino") {
           console.log('[BLE] Found device:', localName);
           noble.stopScanning();
           this.isScanning = false;
@@ -45,6 +45,8 @@ class BLEController {
             console.error('[BLE] Connection error:', err);
             reject(err);
           }
+        } else {
+            console.log('[BLE] Discovered device, but name does not match:', localName);
         }
       });
 
@@ -56,7 +58,7 @@ class BLEController {
           console.warn('[BLE] Device not found within timeout period');
           resolve(false);
         }
-      }, 10000);
+      }, 45000);
     });
   }
 
