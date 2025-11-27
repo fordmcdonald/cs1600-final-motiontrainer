@@ -30,7 +30,7 @@ class PolhemusDriver extends BaseDriver {
 
     if (plotWindow) {
       // Send the position data to the plot window
-      plotWindow.webContents.send("plot-serial-data", {
+      plotWindow.webContents.send("plot-pos-data", {
         x: positionData.x,
         y: positionData.y,
         z: positionData.z,

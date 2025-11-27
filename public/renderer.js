@@ -1,6 +1,8 @@
 console.log("Rendering plot window");
 
 // Initialize global variables
+
+// map of device names to an array of their data
 const rawData = [];
 const labels = []; 
 const previousWindow = [];
@@ -11,6 +13,8 @@ let count = 0;
 let lagSize = 20;
 let movementCounts = 0;
 let trippedWire = false; 
+
+const mockDevices = ["testDevice1", "testDevice2"];
 
 
 let thresholdCooldown = false; 
@@ -49,6 +53,37 @@ function movingAverage(data, windowSize) {
     result.push(avg);
   }
   return result;
+}
+
+// Function to request bluetooth devices from main
+async function fetchBluetoothDevices() {
+  try {
+    // TODO: replace with an actual call
+    
+   return await new Promise((resolve) => resolve(mockDevices));
+  } catch (err) {
+    console.error('Failed to load options:', err);
+  }
+}
+
+// Update devices dropdown with options
+function updateDevicesDropdownOptions(options) {
+  const select = document.getElementById('data-source');
+
+  // clear any options
+  select.innerHTML = '';
+
+  select.size=options.length
+
+  
+  // for every device, add a select option
+  options.forEach((option) => {
+    const opt = document.createElement('option');
+    opt.value = option;
+    opt.textContent = option;
+    opt.style.textAlign = "center";
+    select.appendChild(opt);
+  });
 }
 
 // Chart.js instance
@@ -233,6 +268,14 @@ window.electronAPI.onSendData((data) => {
     updateChartWithNewData(data);
   }
 });
+
+// Load device list when page loads
+window.addEventListener('DOMContentLoaded', async () => {
+  const deviceOptions = await fetchBluetoothDevices();
+  updateDevicesDropdownOptions(deviceOptions);
+});
+
+
 
 // Emulated Data 
 // setInterval(() => {
