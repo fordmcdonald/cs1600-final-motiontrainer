@@ -3,10 +3,11 @@ console.log("Rendering plot window");
 // Initialize global variables
 
 // map of device names to an array of their data
-const rawData = [];
+const rawData = {};
 const labels = []; 
 const previousWindow = [];
-const rawPositionData = [];
+const displacementData = [];
+const deviceOptions = new Set();
 let movementThreshold = 5;
 let windowSize = 3;
 let count = 0; 
@@ -55,16 +56,6 @@ function movingAverage(data, windowSize) {
   return result;
 }
 
-// Function to request bluetooth devices from main
-async function fetchBluetoothDevices() {
-  try {
-    // TODO: replace with an actual call
-    
-   return await new Promise((resolve) => resolve(mockDevices));
-  } catch (err) {
-    console.error('Failed to load options:', err);
-  }
-}
 
 // Update devices dropdown with options
 function updateDevicesDropdownOptions(options) {
@@ -95,7 +86,7 @@ const displacementChart = new Chart(ctx, {
     datasets: [
       {
         label: "Raw Displacement",
-        data: rawData,
+        data: displacementData,
         borderColor: "rgba(255, 99, 132, 0.8)",
         borderWidth: 1,
         fill: false,
@@ -103,7 +94,7 @@ const displacementChart = new Chart(ctx, {
       },
       {
         label: `Moving Average (Window: ${windowSize})`,
-        data: movingAverage(rawData, windowSize),
+        data: movingAverage(displacementData, windowSize),
         borderColor: "rgba(54, 162, 235, 0.8)",
         borderWidth: 2,
         fill: false,
@@ -177,48 +168,96 @@ const displacementChart = new Chart(ctx, {
 
 // Function to handle new data from the serial device driver
 const updateChartWithNewData = (dataPoint) => {
-  const { x, y, z } = dataPoint;
+    // get selected devices
+    const selectedDevices = Array.from(
+        document.getElementById("data-source").selectedOptions
+    ).map((opt) => opt.value);
 
-  const start = rawPositionData.length - 1 - (lagSize + windowSize);
-  const end = start + windowSize;
-  const previousWindow = rawPositionData.slice(start, end);
+    if (selectedDevices.length === 0) {
+        return;
+    }
+
+    // calculate number of points based combined data from selected devices
+    // if there's a distinction, use minimum number of points
+    const numObservations = Math.min(
+        ...selectedDevices.map((device) => rawData[device].length)
+    );
+
+    // data for each variable as an average of each sensor
+    averagedDatapoints = {};
+
+    for (let [key, value] of Object.entries(dataPoint)) {
+        // for numerical categories, take average
+        if (typeof value === "number") {
+            // initialize each field as list of zeros for each observation
+            if (!(key in averagedDatapoints)) {
+                averagedDatapoints[key] = new Array(numObservations).fill(0);
+            }
+
+            // add sum of all datapoints and divide to take average
+            for (let i = 0; i < numObservations; i++) {
+                for (let reading of Object.values(rawData)) {
+                    averagedDatapoints[key][i] += reading[i][key];
+                }
+                averagedDatapoints[key][i] /= Object.keys(rawData).length;
+            }
+
+            
+        }
+    }
+
+    const { x, y, z, name, accelX, accelY, accelZ } = dataPoint;
+
+    const start = numObservations - 1 - (lagSize + windowSize);
+    const end = start + windowSize;
 
 
-  // Calculate the average position of the previous window
-  const avgX =
-    previousWindow.reduce((sum, point) => sum + point.x, 0) / previousWindow.length;
-  const avgY =
-    previousWindow.reduce((sum, point) => sum + point.y, 0) / previousWindow.length;
-  const avgZ =
-    previousWindow.reduce((sum, point) => sum + point.z, 0) / previousWindow.length;
+    // Calculate the average position of the previous window
+    const avgX =
+        averagedDatapoints.x.slice(start, end).reduce((sum, point) => sum + point, 0) /
+        (end-start+1);
+    const avgY =
+        averagedDatapoints.y.slice(start, end).reduce((sum, point) => sum + point, 0) /
+        (end-start+1);
+    const avgZ =
+        averagedDatapoints.z.slice(start, end).reduce((sum, point) => sum + point, 0) /
+        (end-start+1);
 
-  // Calculate displacement magnitude relative to the average of the previous window
-  const deltaX = x - avgX;
-  const deltaY = y - avgY;
-  const deltaZ = z - avgZ;
-  const displacementMagnitude = Math.sqrt(deltaX ** 2 + deltaY ** 2 + deltaZ ** 2);
+    // Calculate displacement magnitude relative to the average of the previous window
+    // TODO: change this to use the averaged value across devices
+    const deltaX = x - avgX;
+    const deltaY = y - avgY;
+    const deltaZ = z - avgZ;
+    const displacementMagnitude = Math.sqrt(
+        deltaX ** 2 + deltaY ** 2 + deltaZ ** 2
+    );
 
 
-  // Update the chart data
-  rawData.push(displacementMagnitude);
-  labels.push(count++); 
+    // Update the chart data
+    displacementData.push(displacementMagnitude);
+    console.log(displacementData)
+    labels.push(count++);
 
-  if (displacementMagnitude > movementThreshold){
-    brokeThreshold()
-  }
+    if (displacementMagnitude > movementThreshold) {
+        brokeThreshold();
+    }
 
-  // Limit data points to avoid performance issues
-  if (rawData.length > 500) {
-    rawData.shift();
-    labels.shift();
-  }
+    // Limit data points to avoid performance issues
+    for (let [device, data] of Object.entries(rawData)) {
+        if (data.left> 500) {
+            rawData[device].shift();
+            labels.shift();
+        }
+    }
 
-  // Update the moving average dataset
-  displacementChart.data.datasets[1].data = movingAverage(rawData, windowSize);
+    // Update the moving average dataset
+    displacementChart.data.datasets[1].data = movingAverage(
+        displacementData,
+        windowSize
+    );
 
-  // Update the chart
-  displacementChart.update();
-
+    // Update the chart
+    displacementChart.update();
 };
 
 // Handle slider updates
@@ -228,7 +267,7 @@ windowSlider.addEventListener("input", (e) => {
   document.getElementById("window-value").textContent = windowSize;
 
   // Update moving average dataset
-  displacementChart.data.datasets[1].data = movingAverage(rawData, windowSize);
+  displacementChart.data.datasets[1].data = movingAverage(displacementData, windowSize);
   displacementChart.data.datasets[1].label = `Moving Average (Window: ${windowSize})`;
 
   displacementChart.update();
@@ -258,22 +297,27 @@ lagSlider.addEventListener("input", (e) => {
 
 // Electron API callback for receiving new serial data
 window.electronAPI.onSendData((data) => {
-  rawPositionData.push(data);
+    if (!(data.name in rawData)) {
+        rawData[data.name] = [];
+    }
+    rawData[data.name].push(data);
 
-  if (rawPositionData.length > 600 ) {
-    rawPositionData.shift();
-  }
+    if (rawData[data.name].length > 600) {
+        rawData[data.name].shift();
+    }
 
-  if (rawPositionData.length >= lagSize + windowSize + 1) {
-    updateChartWithNewData(data);
-  }
+    if (rawData[data.name].length >= lagSize + windowSize + 1) {
+        updateChartWithNewData(data);
+    }
+
+    // update options for devices
+    if (!(deviceOptions.has(data.name))) {
+        deviceOptions.add(data.name);
+        updateDevicesDropdownOptions(deviceOptions);
+    }
+    
 });
 
-// Load device list when page loads
-window.addEventListener('DOMContentLoaded', async () => {
-  const deviceOptions = await fetchBluetoothDevices();
-  updateDevicesDropdownOptions(deviceOptions);
-});
 
 
 
