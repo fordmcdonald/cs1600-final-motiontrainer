@@ -235,7 +235,6 @@ const updateChartWithNewData = (dataPoint) => {
 
     // Update the chart data
     displacementData.push(displacementMagnitude);
-    console.log(displacementData)
     labels.push(count++);
 
     if (displacementMagnitude > movementThreshold) {
