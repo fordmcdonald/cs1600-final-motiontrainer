@@ -3,7 +3,7 @@ const noble = require('@abandonware/noble');
 // BLE UUIDs - must match the Arduino sketch
 const SERVICE_UUID = '19b10000-e8f2-537e-4f6c-d104768a1214';
 const CHAR_UUID = '19b10001-e8f2-537e-4f6c-d104768a1214';
-const DEVICE_NAME = 'UnoR4-LED';
+const DEVICE_NAME = 'UnoR4-Haptic';
 
 class BLEController {
   constructor() {

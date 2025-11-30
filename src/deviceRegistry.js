@@ -8,7 +8,8 @@ module.exports = {
     "/dev/tty.usbserial-A10NW3TT": PolhemusDriver, 
     "COM6": FastTrakDriver,
     "/dev/tty.usbmodem2101": SeeedSenseDriver,  // Serial connection
-    "BLE:XIAO-IMU": SeeedSenseDriver,           // BLE connection
+    // Multiple BLE IMU sensors - each with unique name
+    "BLE:XIAO-IMU-1": SeeedSenseDriver,      // Sensor 1
+    "BLE:XIAO-IMU-2": SeeedSenseDriver,     // Sensor 2
     "mockPath": MockDriver,
-    // Add more devices as needed
 };
