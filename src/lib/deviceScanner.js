@@ -31,15 +31,21 @@ class DeviceScanner {
     console.log('[DeviceScanner] Starting device scan...');
     this.devices = [];
 
-    // Scan BLE devices FIRST (takes precedence over Serial)
-    const bleDevices = await this.scanBLEDevices(bleScanTimeout);
-    console.log(`[DeviceScanner] Found ${bleDevices.length} BLE device(s)`);
-    this.devices.push(...bleDevices);
+    // Scan BLE devices FIRST (takes precedence over Serial) TODO: uncomment this once we resolve blocking
+    // const bleDevices = await this.scanBLEDevices(bleScanTimeout);
+    // console.log(`[DeviceScanner] Found ${bleDevices.length} BLE device(s)`);
+    // this.devices.push(...bleDevices);
 
     // Scan serial ports SECOND
     const serialDevices = await this.scanSerialPorts();
     console.log(`[DeviceScanner] Found ${serialDevices.length} serial device(s)`);
     this.devices.push(...serialDevices);
+
+    // Add a mock device
+    // TODO: parameterize this better
+    this.devices.push(this.getMockDevice("mock1"));
+    this.devices.push(this.getMockDevice("mock2"));
+
 
     console.log(`[DeviceScanner] Total devices found: ${this.devices.length}`);
     console.log('[DeviceScanner] Priority order: BLE devices will be selected first if available');
@@ -202,6 +208,12 @@ class DeviceScanner {
         startScan();
       }
     });
+  }
+  /**
+   * Get a mock device instance
+   */
+  getMockDevice(name) {
+    return {type: 'mock', path: 'mockPath', name}
   }
 
   /**
