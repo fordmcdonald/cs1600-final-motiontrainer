@@ -14,6 +14,7 @@ const { SerialPort } = require("serialport");
 const deviceRegistry = require("../src/deviceRegistry");
 const BLEController = require("../src/lib/bleController");
 const DeviceScanner = require("../src/lib/deviceScanner");
+const DeviceManager = require("../src/lib/deviceManager");
 const { eventCodes, vendorId, productId, comName } = require("./config/trigger");
 
 // handle windows installer set up
@@ -22,7 +23,9 @@ if (require("electron-squirrel-startup")) app.quit();
 // Initialize BLE Controller
 let bleController = null;
 
-let driver;
+// Multi-device support
+let deviceManager = null;
+let driver;  // Keep for backwards compatibility
 
 
 // Define default environment variables
@@ -44,6 +47,7 @@ if (activeProductId) {
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
 let plotWindow;
+let fusionWindow;
 
 // Initialize settings with the JSON data from "settings.json"
 const defaultSettings = {
@@ -133,6 +137,19 @@ function createWindow() {
       },
     });
 
+    fusionWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      icon: "./favicon.ico",
+      webPreferences: {
+        nodeIntegration: true,
+        preload: path.join(__dirname, '../build/preloadFusion.js'),
+        contextIsolation: true,
+        enableRemoteModule: false,
+        webSecurity: false, 
+      },
+    });
+
   } else {
     mainWindow = new BrowserWindow({
       width: 1500,
@@ -162,10 +179,18 @@ function createWindow() {
 
   if (plotWindow) {plotWindow.loadURL(startPlotURL)};
 
+  const startFusionURL =
+  process.env.ELECTRON_START_URL
+    ? `${process.env.ELECTRON_START_URL}/fusionPlot.html` // Append manually for dev mode
+    : `file://${path.join(__dirname, "../build/fusionPlot.html")}`;
+
+  if (fusionWindow) {fusionWindow.loadURL(startFusionURL)};
+
 
   // Open the DevTools.
   process.env.ELECTRON_START_URL && mainWindow.webContents.openDevTools();
   process.env.ELECTRON_START_URL && plotWindow?.webContents.openDevTools();
+  process.env.ELECTRON_START_URL && fusionWindow?.webContents.openDevTools();
 
   // Emitted when the window is closed.
   mainWindow.on("closed", function () {
@@ -182,6 +207,13 @@ function createWindow() {
       // in an array if your app supports multi windows, this is the time
       // when you should delete the corresponding element.
       plotWindow = null;
+    });
+  }
+
+  // Emitted when the fusion window is closed.
+  if (fusionWindow) {
+    fusionWindow.on("closed", function () {
+      fusionWindow = null;
     });
   }
 }
@@ -201,6 +233,20 @@ async function initializeDevices(ipc) {
     console.error('[Electron] BLE LED Controller initialization error:', err);
   }
 
+  // Create BLE trigger callback
+  const bleTrigger = bleController ? () => bleController.flashLED(500) : null;
+
+  // Initialize DeviceManager for multi-device support
+  deviceManager = new DeviceManager(settings, mainWindow, plotWindow, bleTrigger, fusionWindow);
+  
+  // Set fusion window after it loads (non-blocking)
+  if (fusionWindow) {
+    fusionWindow.webContents.once('did-finish-load', () => {
+      console.log('[Electron] Fusion window ready');
+      deviceManager.setFusionWindow(fusionWindow);
+    });
+  }
+
   // Scan for all devices (Serial and BLE)
   const deviceScanner = new DeviceScanner();
   const devices = await deviceScanner.scanAll(5000);  // 5 second BLE scan
@@ -211,9 +257,9 @@ async function initializeDevices(ipc) {
     name: d.name || d.manufacturer
   })));
 
-  let driverFound = false;
+  let devicesInitialized = 0;
 
-  // Try to initialize a driver for each discovered device
+  // Initialize ALL matching devices (not just first one)
   for (const deviceInfo of devices) {
     const path = deviceInfo.path;
 
@@ -221,37 +267,69 @@ async function initializeDevices(ipc) {
     const DriverClass = deviceRegistry[path];
 
     if (DriverClass) {
-      selectedDevice = { 
-        port: deviceInfo, 
-        driver: DriverClass.name,
-        type: deviceInfo.type 
-      };
-
       try {
-        // Create BLE trigger callback
-        const bleTrigger = bleController ? () => bleController.flashLED(500) : null;
-        
         console.log(`[Electron] Initializing ${DriverClass.name} for ${deviceInfo.type} device: ${path}`);
         
-        // Initialize driver with deviceInfo (not portInfo)
-        driver = new DriverClass(deviceInfo, settings, mainWindow, plotWindow, bleTrigger);
-        driverFound = true;
-
-        ipc.on("set-settings", (event, settings, config, saveToFile) => handleSetSettings(event, settings, config, saveToFile, driver));
-
-        console.log(`[Electron] Successfully initialized ${DriverClass.name}`);
-        break; 
+        // Create driver instance
+        const deviceDriver = new DriverClass(deviceInfo, settings, mainWindow, plotWindow, bleTrigger);
+        
+        // Extract device ID from path
+        const deviceId = extractDeviceId(deviceInfo.path, deviceInfo.name);
+        
+        // Add to device manager
+        deviceManager.addDevice(deviceId, deviceDriver);
+        
+        // Keep first device as 'driver' for backwards compatibility
+        if (!driver) {
+          driver = deviceDriver;
+          selectedDevice = { 
+            port: deviceInfo, 
+            driver: DriverClass.name,
+            type: deviceInfo.type 
+          };
+        }
+        
+        devicesInitialized++;
+        console.log(`[Electron] ✓ ${deviceId} initialized (${DriverClass.name})`);
       } catch (error) {
         console.error(`[Electron] Error initializing driver for ${path}:`, error);
       }
     }
   }
 
+  // Register multi-device data callback
+  if (devicesInitialized > 0) {
+    deviceManager.onData((deviceId, data) => {
+      console.log(`[Electron] Data from ${deviceId}: ${data.substring(0, 60)}${data.length > 60 ? '...' : ''}`);
+    });
 
-  if (!driverFound) {
-    throw new Error("No compatible device with a registered driver was found.");
+    console.log(`[Electron] ✅ Initialized ${devicesInitialized} device(s) successfully`);
+    console.log(`[Electron] Active devices:`, deviceManager.getActiveDevices());
+
+    // Set up settings handler for all devices
+    ipc.on("set-settings", (event, settings, config, saveToFile) => handleSetSettings(event, settings, config, saveToFile, driver));
+  } else {
+    console.warn('[Electron] ⚠️  No devices initialized');
   }
+}
 
+/**
+ * Extract meaningful device ID from path/name
+ * @param {string} path - Device path (e.g., "BLE:XIAO-IMU-1")
+ * @param {string} name - Device name
+ * @returns {string} - Device ID for tracking
+ */
+function extractDeviceId(path, name) {
+  if (path.startsWith('BLE:XIAO-IMU-')) {
+    // Extract suffix: "BLE:XIAO-IMU-1" -> "IMU_1"
+    const suffix = path.replace('BLE:XIAO-IMU-', '');
+    return `IMU_${suffix}`;
+  } else if (path.startsWith('BLE:')) {
+    return name || path.replace('BLE:', 'BLE_DEVICE');
+  } else {
+    // Serial device - use manufacturer or path
+    return name || path.split('/').pop();
+  }
 }
 
 // TRIGGER PORT HELPERS

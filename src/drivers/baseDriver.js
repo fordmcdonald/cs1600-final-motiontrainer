@@ -43,7 +43,8 @@ class BaseDriver {
     handleData(data) {
         console.log('[BaseDriver] handleData called with:', data.substring(0, 50));
         this.renderer.webContents.send('sending-data');
-        const {brokeThreshold, thresholdPct } = this.parseData(data, this.plotRenderer);
+        const parseResult = this.parseData(data, this.plotRenderer);
+        const {brokeThreshold, thresholdPct } = parseResult;
         console.log('[BaseDriver] parseData returned - brokeThreshold:', brokeThreshold, 'thresholdPct:', thresholdPct);
         if (brokeThreshold && this.renderer) {
             console.log("[BaseDriver] ⚡ THRESHOLD BROKEN! Triggering callbacks...");
@@ -66,6 +67,9 @@ class BaseDriver {
             }
         }
         this.renderer.webContents.send('threshold-pct', thresholdPct)
+        
+        // Return motion metrics for DeviceManager fusion
+        return parseResult;
     }
 
     updateSettings(settings) {

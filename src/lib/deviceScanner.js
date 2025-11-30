@@ -8,10 +8,16 @@ const noble = require('@abandonware/noble');
 
 // BLE device configurations
 const BLE_DEVICES = {
-  'XIAO-IMU': {
+  'XIAO-IMU-1': {
     serviceUUID: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',  // Nordic UART Service
     txCharUUID: '6e400003-b5a3-f393-e0a9-e50e24dcca9e',   // TX Characteristic (device -> app)
     rxCharUUID: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',   // RX Characteristic (app -> device)
+  },
+  // Multiple IMU sensors - each with unique suffix
+  'XIAO-IMU-2': {
+    serviceUUID: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+    txCharUUID: '6e400003-b5a3-f393-e0a9-e50e24dcca9e',
+    rxCharUUID: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
   }
 };
 
@@ -79,6 +85,9 @@ class DeviceScanner {
       const foundDevices = [];
       let scanTimeout;
 
+      // Remove all previous 'discover' listeners to avoid conflicts
+      noble.removeAllListeners('discover');
+
       // Wait for BLE to be ready
       noble.on('stateChange', (state) => {
         if (state === 'poweredOn') {
@@ -138,8 +147,8 @@ class DeviceScanner {
         
         // Match by exact name first (XIAO-IMU)
         if (deviceName === 'XIAO-IMU') {
-          if (!foundDevices.find(d => d.address === peripheral.address)) {
-            console.log(`[DeviceScanner] ✓ Found XIAO-IMU by name! (RSSI: ${rssi})`);
+          if (!foundDevices.find(d => d.id === peripheral.id)) {
+            console.log(`[DeviceScanner] ✓ Found XIAO-IMU by name! (RSSI: ${rssi}, id: ${peripheral.id})`);
             
             foundDevices.push({
               type: 'ble',
@@ -151,6 +160,7 @@ class DeviceScanner {
               rxCharUUID: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
               rssi: peripheral.rssi,
               address: peripheral.address,
+              id: peripheral.id,
             });
           }
         }
@@ -158,8 +168,11 @@ class DeviceScanner {
         else if (deviceName && BLE_DEVICES[deviceName]) {
           const config = BLE_DEVICES[deviceName];
           
-          if (!foundDevices.find(d => d.address === peripheral.address)) {
-            console.log(`[DeviceScanner] ✓ Found BLE device by name: ${deviceName} (RSSI: ${rssi})`);
+          const alreadyFound = foundDevices.find(d => d.id === peripheral.id);
+          if (alreadyFound) {
+            console.log(`[DeviceScanner] ⚠️  ${deviceName} already in list (id: ${peripheral.id}, existing: ${alreadyFound.name})`);
+          } else {
+            console.log(`[DeviceScanner] ✓ Found BLE device by name: ${deviceName} (RSSI: ${rssi}, id: ${peripheral.id})`);
             
             foundDevices.push({
               type: 'ble',
@@ -171,6 +184,7 @@ class DeviceScanner {
               rxCharUUID: config.rxCharUUID,
               rssi: peripheral.rssi,
               address: peripheral.address,
+              id: peripheral.id,
             });
           }
         }
@@ -178,8 +192,8 @@ class DeviceScanner {
         else if (hasNordicUART) {
           const deviceKey = deviceName || `Nordic-UART-${peripheral.address.slice(-8)}`;
           
-          if (!foundDevices.find(d => d.address === peripheral.address)) {
-            console.log(`[DeviceScanner] ✓ Found Nordic UART device: ${deviceKey} (RSSI: ${rssi})`);
+          if (!foundDevices.find(d => d.id === peripheral.id)) {
+            console.log(`[DeviceScanner] ✓ Found Nordic UART device: ${deviceKey} (RSSI: ${rssi}, id: ${peripheral.id})`);
             
             foundDevices.push({
               type: 'ble',
@@ -191,6 +205,7 @@ class DeviceScanner {
               rxCharUUID: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
               rssi: peripheral.rssi,
               address: peripheral.address,
+              id: peripheral.id,
             });
           }
         }
