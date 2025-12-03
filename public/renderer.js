@@ -196,17 +196,16 @@ const updateChartWithNewData = (dataPoint) => {
 
             // add sum of all datapoints and divide to take average
             for (let i = 0; i < numObservations; i++) {
-                for (let reading of Object.values(rawData)) {
-                    averagedDatapoints[key][i] += reading[i][key];
+                for (let device of selectedDevices) {
+                    averagedDatapoints[key][i] += rawData[device][i][key];
                 }
-                averagedDatapoints[key][i] /= Object.keys(rawData).length;
+                averagedDatapoints[key][i] /= selectedDevices.length;
             }
 
             
         }
     }
 
-    const { x, y, z, name, accelX, accelY, accelZ } = dataPoint;
 
     const start = numObservations - 1 - (lagSize + windowSize);
     const end = start + windowSize;
@@ -225,9 +224,15 @@ const updateChartWithNewData = (dataPoint) => {
 
     // Calculate displacement magnitude relative to the average of the previous window
     // TODO: change this to use the averaged value across devices
-    const deltaX = x - avgX;
-    const deltaY = y - avgY;
-    const deltaZ = z - avgZ;
+    // get most recent averaged datapoint across all devices
+
+    const currX = selectedDevices.reduce((prevSum, currDevice) => prevSum + rawData[currDevice][rawData[currDevice].length-1].x , 0) / selectedDevices.length;
+    const currY = selectedDevices.reduce((prevSum, currDevice) => prevSum + rawData[currDevice][rawData[currDevice].length-1].y , 0) / selectedDevices.length;
+    const currZ = selectedDevices.reduce((prevSum, currDevice) => prevSum + rawData[currDevice][rawData[currDevice].length-1].z , 0) / selectedDevices.length;
+
+    const deltaX = currX - avgX;
+    const deltaY = currY - avgY;
+    const deltaZ = currZ - avgZ;
     const displacementMagnitude = Math.sqrt(
         deltaX ** 2 + deltaY ** 2 + deltaZ ** 2
     );
@@ -243,7 +248,7 @@ const updateChartWithNewData = (dataPoint) => {
 
     // Limit data points to avoid performance issues
     for (let [device, data] of Object.entries(rawData)) {
-        if (data.left> 500) {
+        if (data.length> 500) {
             rawData[device].shift();
             labels.shift();
         }
@@ -305,14 +310,26 @@ window.electronAPI.onSendData((data) => {
         rawData[data.name].shift();
     }
 
-    if (rawData[data.name].length >= lagSize + windowSize + 1) {
+    // get selected devices
+    const selectedDevices = Array.from(
+        document.getElementById("data-source").selectedOptions
+    ).map((opt) => opt.value);
+
+    // if we have enough data for calculations
+    if (
+        rawData[data.name].length >= lagSize + windowSize + 1 &&
+        // current device is a selected one for data
+        selectedDevices.includes(data.name) &&
+        // we have an even amount of data from each selected device
+        selectedDevices.every((device) => rawData[device].length === rawData[data.name].length)
+    ) {
         updateChartWithNewData(data);
     }
 
     // update options for devices
     if (!(deviceOptions.has(data.name))) {
         deviceOptions.add(data.name);
-        updateDevicesDropdownOptions(deviceOptions);
+        updateDevicesDropdownOptions(Array.from(deviceOptions));
     }
     
 });

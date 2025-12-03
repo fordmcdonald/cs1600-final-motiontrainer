@@ -7,7 +7,7 @@ class SeeedSenseDriver extends BaseDriver {
         settings,
         mainWindow,
         plotWindow,
-        bleTriggerCallback
+        bleTriggerCallback,
     ) {
         super(deviceInfo, settings, mainWindow, plotWindow, bleTriggerCallback);
 
@@ -16,25 +16,29 @@ class SeeedSenseDriver extends BaseDriver {
             accel: { x: null, y: null, z: null },
             gyro: { x: null, y: null, z: null },
         };
+
+        this.low = -1;
+
+        this.high = 1;
     }
 
     // use same data parsing as seedsensedriver
     parseData(data, plotWindow) {
         const line = data.trim();
-        console.log("[MockSeeedSense] parseData called with:", line);
+        // console.log("[MockSeeedSense] parseData called with:", line);
 
         // New BLE format: "ACC,x,y,z"
         if (line.startsWith("ACC,")) {
             const parts = line.split(",");
-            console.log("[MockSeeedSense] Parsing ACC format, parts:", parts);
+            // console.log("[MockSeeedSense] Parsing ACC format, parts:", parts);
             if (parts.length === 4) {
                 this.dataBuffer.accel.x = parseFloat(parts[1]);
                 this.dataBuffer.accel.y = parseFloat(parts[2]);
                 this.dataBuffer.accel.z = parseFloat(parts[3]);
-                console.log(
-                    "[MockSeeedSense] Parsed accel values:",
-                    this.dataBuffer.accel
-                );
+                // console.log(
+                //     "[MockSeeedSense] Parsed accel values:",
+                //     this.dataBuffer.accel
+                // );
                 // For BLE format, we have complete data immediately
             }
         }
@@ -52,7 +56,7 @@ class SeeedSenseDriver extends BaseDriver {
             this.dataBuffer.accel.y !== null &&
             this.dataBuffer.accel.z !== null;
 
-        console.log("[MockSeeedSense] Has complete data:", hasCompleteData);
+        // console.log("[MockSeeedSense] Has complete data:", hasCompleteData);
 
         if (!hasCompleteData) {
             return { brokeThreshold: false, thresholdPct: 0 };
@@ -75,11 +79,11 @@ class SeeedSenseDriver extends BaseDriver {
             z: this.dataBuffer.accel.z * 10,
         };
 
-        console.log("[MockSeeedSense] Position data created:", {
-            x: positionData.x.toFixed(4),
-            y: positionData.y.toFixed(4),
-            z: positionData.z.toFixed(4),
-        });
+        // console.log("[MockSeeedSense] Position data created:", {
+        //     x: positionData.x.toFixed(4),
+        //     y: positionData.y.toFixed(4),
+        //     z: positionData.z.toFixed(4),
+        // });
 
         // Reset buffer for next reading
         this.dataBuffer = {
@@ -93,9 +97,9 @@ class SeeedSenseDriver extends BaseDriver {
             this.positionBuffer.shift();
         }
 
-        console.log(
-            `Buffer filling: ${this.positionBuffer.length}/${this.positionBufferSize}`
-        );
+        // console.log(
+        //     `Buffer filling: ${this.positionBuffer.length}/${this.positionBufferSize}`
+        // );
 
         if (this.positionBuffer.length < this.positionBufferSize) {
             return { brokeThreshold: false, thresholdPct: 0 };
@@ -133,18 +137,18 @@ class SeeedSenseDriver extends BaseDriver {
         );
 
         // Check if motion magnitude exceeds the threshold
-        console.log(
-            "[MockSeeedSense] Motion Mag:",
-            motionMagnitude.toFixed(4),
-            "Threshold: 2, Current tolerance:",
-            this.tolerance
-        );
+        // console.log(
+        //     "[MockSeeedSense] Motion Mag:",
+        //     motionMagnitude.toFixed(4),
+        //     "Threshold: 2, Current tolerance:",
+        //     this.tolerance
+        // );
 
         if (motionMagnitude > 2) {
-            console.log(
-                "[MockSeeedSense] ⚡ BROKE THRESHOLD! Motion Mag:",
-                motionMagnitude.toFixed(4)
-            );
+            // console.log(
+            //     "[MockSeeedSense] ⚡ BROKE THRESHOLD! Motion Mag:",
+            //     motionMagnitude.toFixed(4)
+            // );
             return { brokeThreshold: true, thresholdPct: 1 };
         }
 
@@ -163,8 +167,8 @@ class SeeedSenseDriver extends BaseDriver {
     generateMockData() {
         // Generate random motion data (simulating accelerometer readings)
         // goes from -1 to 1
-        const mockAccelX = (Math.random() - 0.5) * 2;
-        const mockAccelY = (Math.random() - 0.5) * 2;
+        const mockAccelX = (Math.random()) * (this.high-this.low) + this.low;
+        const mockAccelY = (Math.random()) * (this.high-this.low) + this.low;
 
         // add 1g for gravity
         const mockAccelZ = (Math.random() - 0.5) * 2 + 1;
@@ -173,7 +177,7 @@ class SeeedSenseDriver extends BaseDriver {
             4
         )},${mockAccelZ.toFixed(4)}`;
 
-        console.log("[MockSeeedSense] MOCK data generated:", mockPacket);
+        // console.log("[MockSeeedSense] MOCK data generated:", mockPacket);
 
         // Process the mock data as if it came from BLE
         this.handleData(mockPacket);
@@ -182,14 +186,14 @@ class SeeedSenseDriver extends BaseDriver {
     // mock the initialization of the ble
     async initializeMockBLE() {
         try {
-            console.log(
-                "[MockSeeedSense] Initializing MOCK BLE (no real Bluetooth)"
-            );
+            // console.log(
+            // "[MockSeeedSense] Initializing MOCK BLE (no real Bluetooth)"
+            // );
 
             return new Promise((resolve) => {
                 // Simulate connection delay
                 setTimeout(() => {
-                    console.log("[MockSeeedSense] MOCK: Connected to device");
+                    // console.log("[MockSeeedSense] MOCK: Connected to device");
 
                     // Start generating mock data every 100ms
                     this.mockDataInterval = setInterval(() => {

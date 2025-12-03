@@ -49,8 +49,10 @@ class DeviceScanner {
 
     // Add a mock device
     // TODO: parameterize this better
-    this.devices.push(this.getMockDevice("mock1"));
-    this.devices.push(this.getMockDevice("mock2"));
+    for (let i = 0; i < 30; i++) {
+        this.devices.push(this.getMockDevice(`mock${i}`));
+    }
+  
 
 
     console.log(`[DeviceScanner] Total devices found: ${this.devices.length}`);
