@@ -299,18 +299,21 @@ lagSlider.addEventListener("input", (e) => {
 });
 
 let lastTriggerTime = 0;
-// add event listener for triggered mock
-window.addEventListener("keydown", (event) => {
-    if (event.key === "t") {
-        event.preventDefault();
-        const now = Date.now();
-        if (now - lastTriggerTime < 500) {
-            return;
-        }
-        lastTriggerTime = now;
+const TRIGGER_COOLDOWN = 1000; 
 
-        window.electronAPI.triggerMocks();
+// add event listener for triggered mock
+window.addEventListener('keydown', (event) => {
+  if (event.key === 't' || event.key === 'T') {
+    event.preventDefault();
+    
+    const now = Date.now();
+    if (now - lastTriggerTime < TRIGGER_COOLDOWN) {
+      return;
     }
+    
+    lastTriggerTime = now;
+    window.electronAPI.triggerMocks();
+  }
 });
 
 // Electron API callback for receiving new data
