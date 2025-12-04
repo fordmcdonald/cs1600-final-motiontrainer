@@ -757,9 +757,7 @@ const handleBuildUserDataPath = (event, segments = []) => {
 // function to trigger all triggered mocks (called by ipc)
 const handleTriggerMocks = () => {
     for (let driver of deviceManager.getAllDrivers()) {
-        // if this is a triggerable driver
-        if (typeof driver.triggerAcceleration === "function") {
-            // trigger acceleration
+        if (driver.constructor.name === 'TriggeredMockDriver' && typeof driver.triggerAcceleration === "function") {
             driver.triggerAcceleration();
         }
     }
