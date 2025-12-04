@@ -223,7 +223,6 @@ const updateChartWithNewData = (dataPoint) => {
         (end-start+1);
 
     // Calculate displacement magnitude relative to the average of the previous window
-    // TODO: change this to use the averaged value across devices
     // get most recent averaged datapoint across all devices
 
     const currX = selectedDevices.reduce((prevSum, currDevice) => prevSum + rawData[currDevice][rawData[currDevice].length-1].x , 0) / selectedDevices.length;
@@ -299,7 +298,22 @@ lagSlider.addEventListener("input", (e) => {
   
 });
 
-// Electron API callback for receiving new serial data
+let lastTriggerTime = 0;
+// add event listener for triggered mock
+window.addEventListener("keydown", (event) => {
+    if (event.key === "t") {
+        event.preventDefault();
+        const now = Date.now();
+        if (now - lastTriggerTime < 500) {
+            return;
+        }
+        lastTriggerTime = now;
+
+        window.electronAPI.triggerMocks();
+    }
+});
+
+// Electron API callback for receiving new data
 window.electronAPI.onSendData((data) => {
     if (!(data.name in rawData)) {
         rawData[data.name] = [];

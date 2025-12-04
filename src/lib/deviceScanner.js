@@ -48,10 +48,12 @@ class DeviceScanner {
     this.devices.push(...serialDevices);
 
     // Add a mock device
-    // TODO: parameterize this better
-    for (let i = 0; i < 30; i++) {
-        this.devices.push(this.getMockDevice(`mock${i}`));
-    }
+    // for (let i = 0; i < 30; i++) {
+    //     this.devices.push(this.getMockDevice(`mock${i}`));
+    // }
+    this.devices.push(this.getTriggeredMockDevice("triggeredMock"));
+
+
   
 
 
@@ -231,6 +233,13 @@ class DeviceScanner {
    */
   getMockDevice(name) {
     return {type: 'mock', path: 'mockPath', name}
+  }
+
+   /**
+   * Get a mock device instance
+   */
+  getTriggeredMockDevice(name) {
+    return {type: 'mock', path: 'triggeredMockPath', name}
   }
 
   /**

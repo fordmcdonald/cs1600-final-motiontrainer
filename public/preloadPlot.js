@@ -5,5 +5,6 @@ const { contextBridge, ipcRenderer } = require('electron')
 process.once("loaded", () => {
   contextBridge.exposeInMainWorld('electronAPI', {
     onSendData: (callback) => ipcRenderer.on('plot-pos-data', (_event, value) => callback(value)),
+    triggerMocks: () => ipcRenderer.send('trigger-mocks'), 
   });
 });
