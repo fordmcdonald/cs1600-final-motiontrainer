@@ -1,3 +1,5 @@
+#include "arduino_fsm.h"
+
 #include <Wire.h>
 #include "Adafruit_DRV2605.h"
 #include <ArduinoBLE.h>
@@ -13,33 +15,7 @@ BLECharacteristic hapticChar(
   1 
 );
 
-// -------------------- FSM DEFINITIONS --------------------
-enum HapticState {
-  S_INIT = 0,
-  S_ADVERTISING,
-  S_CONNECTED_OFF,
-  S_CONNECTED_ON
-};
-
-struct HapticFSMState {
-  HapticState state;
-  bool bleInitialized;
-  bool advertising;
-  bool centralConnected;
-  bool motorOn;
-  bool thresholdActive;
-  String centralAddress;
-};
-
-struct HapticInputs {
-  bool centralConnected;
-  bool centralJustConnected;
-  bool centralJustDisconnected;
-  bool thresholdActive;
-  bool thresholdUpdated;
-  BLEDevice central;
-};
-
+// -------------------- FSM Static Variables --------------------
 static HapticFSMState fsmState = {
   S_INIT,
   false,   // bleInitialized
@@ -88,6 +64,15 @@ bool configureBLEStack() {
 }
 
 bool tryInitializeBLE(HapticFSMState &state) {
+  #ifdef TESTING
+  // Use centralAddress variable to mock tryInitializeBLE behavior in FSM unit test
+  if (state.centralAddress == "") {
+    return true;
+  } else {
+    return false;
+  }
+  #else
+  
   if (state.bleInitialized) {
     return true;
   }
@@ -103,6 +88,7 @@ bool tryInitializeBLE(HapticFSMState &state) {
   state.bleInitialized = true;
   Serial.println("BLE initialization successful");
   return true;
+  #endif
 }
 
 void ensureAdvertising(HapticFSMState &state) {
@@ -226,6 +212,10 @@ void setup() {
   }
   Serial.println("Setting up BLE + Haptics with FSM...");
 
+  #ifdef TESTING
+  testAll()
+  while(true);
+  #else
   if (!drv.begin()) {
     Serial.println("Could not find DRV2605, check wiring!");
     while (1) {
@@ -235,6 +225,7 @@ void setup() {
 
   drv.selectLibrary(1);
   drv.setMode(DRV2605_MODE_INTTRIG);
+  #endif
 }
 
 void loop() {
