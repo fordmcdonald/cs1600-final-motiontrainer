@@ -246,11 +246,16 @@ const updateChartWithNewData = (dataPoint) => {
     }
 
     // Limit data points to avoid performance issues
-    for (let [device, data] of Object.entries(rawData)) {
-        if (data.length> 500) {
-            rawData[device].shift();
-            labels.shift();
-        }
+     if (displacementData.length > 500) {
+        displacementData.shift();
+        labels.shift();
+        
+        // Shift all chart datasets
+        displacementChart.data.datasets.forEach(dataset => {
+            if (dataset.data.length > 500) {
+                dataset.data.shift();
+            }
+        });
     }
 
     // Update the moving average dataset
@@ -323,9 +328,6 @@ window.electronAPI.onSendData((data) => {
     }
     rawData[data.name].push(data);
 
-    if (rawData[data.name].length > 600) {
-        rawData[data.name].shift();
-    }
 
     // get selected devices
     const selectedDevices = Array.from(
