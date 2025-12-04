@@ -47,7 +47,7 @@ class DeviceScanner {
     console.log(`[DeviceScanner] Found ${serialDevices.length} serial device(s)`);
     this.devices.push(...serialDevices);
 
-    // Add a mock device
+    // Add mock devices (if you want)
     // for (let i = 0; i < 30; i++) {
     //     this.devices.push(this.getMockDevice(`mock${i}`));
     // }

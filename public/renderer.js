@@ -121,7 +121,7 @@ const displacementChart = new Chart(ctx, {
     },
     scales: {
       x: { title: { display: true, text: "Time / Index" } },
-      y: { title: { display: true, text: "Displacement Magnitude" } },
+      y: { title: { display: true, text: "Acceleration Magnitude" } },
     },
   },
   plugins: [
