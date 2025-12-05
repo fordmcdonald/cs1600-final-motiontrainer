@@ -401,6 +401,14 @@ class DeviceManager {
   }
 
   /**
+   * Get all drivers as an array
+   * @returns Array of driver classes
+   */
+  getAllDrivers() {
+    return Array.from(this.drivers.values());
+  }
+
+  /**
    * Close all devices
    */
   closeAll() {

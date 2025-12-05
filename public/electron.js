@@ -806,6 +806,15 @@ const handleBuildUserDataPath = (event, segments = []) => {
   return path.join(app.getPath("userData"), ...segments);
 };
 
+// function to trigger all triggered mocks (called by ipc)
+const handleTriggerMocks = () => {
+    for (let driver of deviceManager.getAllDrivers()) {
+        if (driver.constructor.name === 'TriggeredMockDriver' && typeof driver.triggerAcceleration === "function") {
+            driver.triggerAcceleration();
+        }
+    }
+}
+
 app.whenReady().then(async () => {
   log.info("App Ready: ", app.name);
 
@@ -815,6 +824,7 @@ app.whenReady().then(async () => {
 
   // Handle ipcRenderer events (on is renderer -> main, handle is renderer <--> main)
   ipc.on("increment-stage", handleIncrementStage);
+  ipc.on("trigger-mocks", handleTriggerMocks);
   ipc.handle("get-settings", handleFetchSettings);
   ipc.handle('get-device', handleFetchDevice);
   ipc.handle("get-current-settings", handleFetchCurrentSettings);

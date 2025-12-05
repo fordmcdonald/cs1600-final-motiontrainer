@@ -37,15 +37,25 @@ class DeviceScanner {
     console.log('[DeviceScanner] Starting device scan...');
     this.devices = [];
 
-    // Scan BLE devices FIRST (takes precedence over Serial)
-    const bleDevices = await this.scanBLEDevices(bleScanTimeout);
-    console.log(`[DeviceScanner] Found ${bleDevices.length} BLE device(s)`);
-    this.devices.push(...bleDevices);
+    // Scan BLE devices FIRST (takes precedence over Serial) TODO: uncomment this once we resolve blocking
+    // const bleDevices = await this.scanBLEDevices(bleScanTimeout);
+    // console.log(`[DeviceScanner] Found ${bleDevices.length} BLE device(s)`);
+    // this.devices.push(...bleDevices);
 
     // Scan serial ports SECOND
     const serialDevices = await this.scanSerialPorts();
     console.log(`[DeviceScanner] Found ${serialDevices.length} serial device(s)`);
     this.devices.push(...serialDevices);
+
+    // Add mock devices (if you want)
+    // for (let i = 0; i < 5; i++) {
+    //     this.devices.push(this.getMockDevice(`mock${i}`));
+    // }
+    this.devices.push(this.getTriggeredMockDevice("triggeredMock"));
+
+
+  
+
 
     console.log(`[DeviceScanner] Total devices found: ${this.devices.length}`);
     console.log('[DeviceScanner] Priority order: BLE devices will be selected first if available');
@@ -217,6 +227,19 @@ class DeviceScanner {
         startScan();
       }
     });
+  }
+  /**
+   * Get a mock device instance
+   */
+  getMockDevice(name) {
+    return {type: 'mock', path: 'mockPath', name}
+  }
+
+   /**
+   * Get a mock device instance
+   */
+  getTriggeredMockDevice(name) {
+    return {type: 'mock', path: 'triggeredMockPath', name}
   }
 
   /**
