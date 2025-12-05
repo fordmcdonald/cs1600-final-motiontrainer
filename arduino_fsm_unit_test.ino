@@ -82,7 +82,7 @@ bool testTransition(HapticFSMState start,
     Serial.println(sToPrint);
     sprintf(sToPrint, "End state expected: %s | actual: %s", s2str(end.state), s2str(res.state));
     Serial.println(sToPrint);
-    sprintf(sToPrint, "Inputs: centralConnected %d | centralJustConnected %d | centralJustDisconnected %d | thresholdActive %d | thresholdUpdated %d", input.centralConnected, input.centralJustConnected, input.centralJustDisconnected, input.thresholdActive, input.thresholdUpdated);
+    sprintf(sToPrint, "Inputs: tryInitializeBLE %d | centralConnected %d | centralJustConnected %d | centralJustDisconnected %d | thresholdActive %d | thresholdUpdated %d", start.centralAddress == "", input.centralConnected, input.centralJustConnected, input.centralJustDisconnected, input.thresholdActive, input.thresholdUpdated);
     Serial.println(sToPrint);
     sprintf(sToPrint, "          %14s | %11s | %16s | %7s | %15s", "bleInitialized", "advertising", "centralConnected", "motorOn", "thresholdActive");
     Serial.println(sToPrint);
@@ -105,11 +105,11 @@ const HapticFSMState testStatesIn[10] = {
   {(HapticState)1, 0, 0, 0, 0, 0, ""}, // Test 1
   {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 2
   {(HapticState)2, 0, 1, 0, 0, 0, ""}, // Test 3
-  {(HapticState)3, 0, 0, 0, 0, 0, ""}, // Test 4
-  {(HapticState)3, 0, 0, 0, 0, 0, ""}, // Test 5
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 4
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 5
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 6
-  {(HapticState)4, 0, 0, 0, 0, 1, ""}, // Test 7
-  {(HapticState)4, 0, 0, 0, 1, 1, ""}, // Test 8
+  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 7
+  {(HapticState)4, 0, 0, 1, 1, 1, ""}, // Test 8
   {(HapticState)4, 0, 0, 1, 1, 1, ""}  // Test 9
 };
 
@@ -118,11 +118,11 @@ const HapticFSMState testStatesOut[10] = {
   {(HapticState)2, 1, 1, 0, 0, 0, ""}, // Test 1
   {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 2
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 3
-  {(HapticState)3, 0, 0, 0, 0, 0, ""}, // Test 4
-  {(HapticState)4, 0, 0, 0, 1, 1, ""}, // Test 5
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 4
+  {(HapticState)4, 0, 0, 1, 1, 1, ""}, // Test 5
   {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 6
-  {(HapticState)4, 0, 0, 0, 0, 1, ""}, // Test 7
-  {(HapticState)3, 0, 0, 0, 0, 0, ""}, // Test 8
+  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 7
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 8
   {(HapticState)2, 0, 0, 0, 0, 0, ""}  // Test 9
 };
 
@@ -130,7 +130,7 @@ const state_inputs testInputs[10] = {
   {0, 0, 0, 0, 0, 0}, // Test 0
   {1, 0, 0, 0, 0, 0}, // Test 1
   {0, 0, 0, 0, 0, 0}, // Test 2
-  {0, 0, 1, 0, 0, 0}, // Test 3
+  {0, 1, 1, 0, 0, 0}, // Test 3
   {0, 1, 0, 0, 1, 0}, // Test 4
   {0, 1, 0, 0, 1, 1}, // Test 5
   {0, 0, 0, 1, 0, 0}, // Test 6
@@ -140,7 +140,6 @@ const state_inputs testInputs[10] = {
 };
 
 const int numTests = 10;
-
 
 /*
  * Runs through all the test cases defined above

@@ -76,6 +76,7 @@ bool tryInitializeBLE(HapticFSMState &state) {
   #ifdef TESTING
   // Use centralAddress variable to mock tryInitializeBLE behavior in FSM unit test
   if (state.centralAddress == "") {
+    state.bleInitialized = true;
     return true;
   } else {
     return false;
@@ -218,7 +219,7 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
 
 // -------------------- ARDUINO LIFECYCLE --------------------
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   while (!Serial && millis() < 5000) {
     delay(10);
   }
