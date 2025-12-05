@@ -8,6 +8,14 @@
 </head>
 <body>
   <h1 style="text-align: center;">Moving Average Visualization</h1>
+    <!-- Data Source Dropdown -->
+    <div style="padding: 8px 12px;text-align: center; display: flex; justify-content: center; align-items: center; ">
+        <label for="data-source">Data Sources (Multiselect):</label>
+        <select id="data-source" multiple  style="font-size: 16px; border-radius: 4px; border: 1px solid #ccc; background-color: white; cursor: pointer; min-width: 200px; margin-left: 3px;">
+            <option value="">Loading...</option>
+        </select>
+    </div>
+
 
   <div style="display: flex; flex-direction: row; justify-content: space-around; align-items: center;">
     <!-- Slider -->
@@ -35,6 +43,10 @@
   <!-- Chart Canvas -->
   <div style="width: 80%; margin: auto;">
     <canvas id="displacementChart"></canvas>
+  </div>
+
+   <div style="width: 80%; margin: auto;">
+    <canvas id="accelerationChart"></canvas>
   </div>
 
   <script src="./renderer.js"></script>
