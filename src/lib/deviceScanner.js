@@ -48,7 +48,7 @@ class DeviceScanner {
     this.devices.push(...serialDevices);
 
     // Add mock devices (if you want)
-    // for (let i = 0; i < 30; i++) {
+    // for (let i = 0; i < 5; i++) {
     //     this.devices.push(this.getMockDevice(`mock${i}`));
     // }
     this.devices.push(this.getTriggeredMockDevice("triggeredMock"));

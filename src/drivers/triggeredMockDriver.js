@@ -23,7 +23,7 @@ class TriggeredMockDriver extends RandomizedMockDriver {
         this.high = 1;
 
         // magnitude of acceleration trigger when in trigger mdoe
-        this.triggerMagnitude = 100;
+        this.triggerMagnitude = 1;
 
         // Motion detection properties
         this.previousMagnitude = null;
@@ -53,16 +53,26 @@ class TriggeredMockDriver extends RandomizedMockDriver {
 
     // function that triggers acceleration passed threshold
     triggerAcceleration() {
+
+        if (this.mockDataInterval) {
+            clearInterval(this.mockDataInterval);
+            this.mockDataInterval = null;
+        }
+
         const mockPacket = `ACC,${this.triggerMagnitude.toFixed(
             4
         )},${this.triggerMagnitude.toFixed(4)},${(
             this.triggerMagnitude + 1
         ).toFixed(4)}`;
 
-        console.log("TRIGGERING ACCEL with", mockPacket)
-
         // Process the mock data as if it came from BLE
         this.handleData(mockPacket);
+
+        setTimeout(() => {
+            this.mockDataInterval = setInterval(() => {
+                this.generateMockData();
+            }, 100);
+        }, 200);
     }
 }
 
