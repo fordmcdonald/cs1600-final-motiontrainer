@@ -1,11 +1,16 @@
-#include "arduino_fsm.h"
-
 #include <Wire.h>
-#include "Adafruit_DRV2605.h"
 #include <ArduinoBLE.h>
 
+#include "arduino_fsm.h"
+
+#ifndef TESTING
+#include "Adafruit_DRV2605.h"
+#endif
+
 // -------------------- HAPTIC (DRV2605) --------------------
+#ifndef TESTING
 Adafruit_DRV2605 drv;
+#endif
 
 // -------------------- BLE --------------------
 BLEService hapticService("19B10000-E8F2-537E-4F6C-D104768A1214");
@@ -220,7 +225,7 @@ void setup() {
   Serial.println("Setting up BLE + Haptics with FSM...");
 
   #ifdef TESTING
-  testAll()
+  testAll();
   while(true);
   
   #else

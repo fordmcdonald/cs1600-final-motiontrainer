@@ -1,11 +1,11 @@
-// #define TESTING
+#define TESTING
 
 // -------------------- FSM DEFINITIONS --------------------
 enum HapticState {
-  S_INIT = 0,
-  S_ADVERTISING,
-  S_CONNECTED_OFF,
-  S_CONNECTED_ON
+  S_INIT = 1,
+  S_ADVERTISING = 2,
+  S_CONNECTED_OFF = 3,
+  S_CONNECTED_ON = 4
 };
 
 struct HapticFSMState {
