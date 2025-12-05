@@ -258,6 +258,7 @@ class DeviceManager {
         console.log('[DeviceManager] ⏳ Watchdog waiting for sensors to initialize');
       }
       this.petWatchdog();
+      console.log('[DeviceManager] Petting watchdog in idle state ');
       this.watchdogLastState = 'idle';
       return;
     }

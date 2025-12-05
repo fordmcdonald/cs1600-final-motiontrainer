@@ -38,9 +38,9 @@ class DeviceScanner {
     this.devices = [];
 
     // Scan BLE devices FIRST (takes precedence over Serial) TODO: uncomment this once we resolve blocking
-    // const bleDevices = await this.scanBLEDevices(bleScanTimeout);
-    // console.log(`[DeviceScanner] Found ${bleDevices.length} BLE device(s)`);
-    // this.devices.push(...bleDevices);
+    const bleDevices = await this.scanBLEDevices(bleScanTimeout);
+    console.log(`[DeviceScanner] Found ${bleDevices.length} BLE device(s)`);
+    this.devices.push(...bleDevices);
 
     // Scan serial ports SECOND
     const serialDevices = await this.scanSerialPorts();
