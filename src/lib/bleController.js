@@ -3,12 +3,12 @@ const noble = require('@abandonware/noble');
 // BLE UUIDs - must match the Arduino sketch
 const SERVICE_UUID = '19b10000-e8f2-537e-4f6c-d104768a1214';
 const CHAR_UUID = '19b10001-e8f2-537e-4f6c-d104768a1214';
-const DEVICE_NAME = 'UnoR4-LED';
+const DEVICE_NAME = 'UnoR4-Haptic';
 
 class BLEController {
   constructor() {
     this.peripheral = null;
-    this.ledCharacteristic = null;
+    this.hapticCharacteristic = null;
     this.isConnected = false;
     this.isScanning = false;
   }
@@ -81,13 +81,13 @@ class BLEController {
           (err, services, characteristics) => {
             if (err) return reject(err);
 
-            this.ledCharacteristic = characteristics[0];
-            if (!this.ledCharacteristic) {
-              return reject(new Error('[BLE] LED characteristic not found'));
+            this.hapticCharacteristic = characteristics[0];
+            if (!this.hapticCharacteristic) {
+              return reject(new Error('[BLE] Haptic characteristic not found'));
             }
 
             this.isConnected = true;
-            console.log('[BLE] LED characteristic discovered and ready');
+            console.log('[BLE] Haptic characteristic discovered and ready');
             resolve();
           }
         );
@@ -97,52 +97,36 @@ class BLEController {
       peripheral.on('disconnect', () => {
         console.log('[BLE] Device disconnected');
         this.isConnected = false;
-        this.ledCharacteristic = null;
+        this.hapticCharacteristic = null;
         this.peripheral = null;
       });
     });
   }
 
   /**
-   * Write a value to the LED characteristic
+   * Write a value to the Haptic characteristic
    * @param {number} value - Value to write (0-255 for PWM control)
    * @returns {Promise<boolean>} - True if write successful
    */
-  async writeLED(value = 0xff) {
-    if (!this.isConnected || !this.ledCharacteristic) {
-      console.warn('[BLE] Not connected, cannot write to LED');
-      return false;
-    }
-
-    return new Promise((resolve, reject) => {
-      const buf = Buffer.from([value]);
-
-      this.ledCharacteristic.write(buf, false, (err) => {
-        if (err) {
-          console.error('[BLE] Error writing to LED:', err);
-          reject(err);
-        } else {
-          console.log(`[BLE] Wrote value ${value} to LED characteristic`);
-          resolve(true);
-        }
-      });
-    });
+  async writeHaptic(value = 0xff) {
+    const buf = Buffer.from([value]);
+    return this.writeCharacteristic(buf, `value ${value}`);
   }
 
   /**
-   * Trigger LED (turn on full, can be extended for patterns)
+   * Trigger Haptic (turn on full, can be extended for patterns)
    * @returns {Promise<boolean>}
    */
-  async triggerLED() {
-    return await this.writeLED(0xff);
+  async triggerHaptic() {
+    return await this.writeHaptic(0xff);
   }
 
   /**
-   * Turn off LED
+   * Turn off Haptic
    * @returns {Promise<boolean>}
    */
-  async turnOffLED() {
-    return await this.writeLED(0x00);
+  async turnOffHaptic() {
+    return await this.writeHaptic(0x00);
   }
 
   /**
@@ -150,11 +134,46 @@ class BLEController {
    * @param {number} duration - Duration in ms to keep LED on
    * @returns {Promise<void>}
    */
-  async flashLED(duration = 500) {
-    await this.triggerLED();
+  async flashHaptic(duration = 500) {
+    await this.triggerHaptic();
     setTimeout(async () => {
-      await this.turnOffLED();
+      await this.turnOffHaptic();
     }, duration);
+  }
+
+  /**
+   * Send watchdog heartbeat command
+   * @param {number} command - Byte to send for heartbeat (default 'H')
+   * @returns {Promise<boolean>}
+   */
+  async sendWatchdogHeartbeat(command = 0x48) {
+    const buf = Buffer.from([command]);
+    return this.writeCharacteristic(buf, 'watchdog heartbeat');
+  }
+
+  /**
+   * Low-level helper to write buffer to haptic characteristic
+   * @param {Buffer} buffer
+   * @param {string} debugLabel
+   * @returns {Promise<boolean>}
+   */
+  async writeCharacteristic(buffer, debugLabel = 'payload') {
+    if (!this.isConnected || !this.hapticCharacteristic) {
+      console.warn('[BLE] Not connected, cannot write characteristic');
+      return false;
+    }
+
+    return new Promise((resolve, reject) => {
+      this.hapticCharacteristic.write(buffer, false, (err) => {
+        if (err) {
+          console.error(`[BLE] Error writing ${debugLabel}:`, err);
+          reject(err);
+        } else {
+          console.log(`[BLE] Wrote ${debugLabel} (${buffer.toString('hex')})`);
+          resolve(true);
+        }
+      });
+    });
   }
 
   /**

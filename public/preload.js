@@ -43,4 +43,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return isDeepStrictEqual(obj1, obj2);
   },
   pickConfigFile: () => ipcRenderer.invoke("dialog:openConfig"),
+  triggerMocks: () => ipcRenderer.send('trigger-mocks'), 
 });

@@ -14,6 +14,14 @@ class SeeedSenseDriver extends BaseDriver {
       accel: { x: null, y: null, z: null },
       gyro: { x: null, y: null, z: null }
     };
+    
+    // Motion detection properties
+    this.previousMagnitude = null;
+    this.baselineMagnitude = 9.8;  // ~1g, will be calibrated
+    this.isCalibrated = false;
+    this.calibrationSamples = [];
+    this.calibrationSampleCount = 100;  // 100 samples for calibration
+    this.magnitudeThreshold = 0.2;  // Default: 0.2 m/s² change
   }
 
   parseData(data, plotWindow) {
@@ -54,6 +62,44 @@ class SeeedSenseDriver extends BaseDriver {
         return { brokeThreshold: false, thresholdPct: 0 };
       }
       
+      // Calculate acceleration magnitude (total acceleration including gravity)
+      const accelX_mss = this.dataBuffer.accel.x * 9.8;  // Convert g to m/s²
+      const accelY_mss = this.dataBuffer.accel.y * 9.8;
+      const accelZ_mss = this.dataBuffer.accel.z * 9.8;
+      const magnitude = Math.sqrt(accelX_mss * accelX_mss + accelY_mss * accelY_mss + accelZ_mss * accelZ_mss);
+      
+      // Calibration mode: collect samples
+      if (!this.isCalibrated && this.calibrationSamples.length < this.calibrationSampleCount) {
+        this.calibrationSamples.push(magnitude);
+        
+        if (this.calibrationSamples.length === this.calibrationSampleCount) {
+          // Calculate baseline and threshold
+          const sum = this.calibrationSamples.reduce((a, b) => a + b, 0);
+          this.baselineMagnitude = sum / this.calibrationSampleCount;
+          
+          // Calculate standard deviation for noise threshold
+          const variance = this.calibrationSamples.reduce((sum, val) => {
+            return sum + Math.pow(val - this.baselineMagnitude, 2);
+          }, 0) / this.calibrationSampleCount;
+          const stdDev = Math.sqrt(variance);
+          
+          // Set threshold at 3x standard deviation (captures 99.7% of noise)
+          this.magnitudeThreshold = Math.max(0.15, 3 * stdDev);  // Minimum 0.15 m/s²
+          
+          this.isCalibrated = true;
+          console.log(`[SeeedSense] ✅ Calibrated: baseline=${this.baselineMagnitude.toFixed(2)} m/s², threshold=${this.magnitudeThreshold.toFixed(3)} m/s²`);
+        } else {
+          console.log(`[SeeedSense] Calibrating... ${this.calibrationSamples.length}/${this.calibrationSampleCount}`);
+        }
+      }
+      
+      // Calculate change in magnitude (motion detection)
+      let deltaMagnitude = 0;
+      if (this.previousMagnitude !== null) {
+        deltaMagnitude = Math.abs(magnitude - this.previousMagnitude);
+      }
+      this.previousMagnitude = magnitude;
+      
       // Create position data from accelerometer readings
       const positionData = {
         type: "motion",
@@ -69,6 +115,11 @@ class SeeedSenseDriver extends BaseDriver {
         x: this.dataBuffer.accel.x * 10,
         y: this.dataBuffer.accel.y * 10,
         z: this.dataBuffer.accel.z * 10,
+        // Motion detection metrics
+        magnitude: magnitude,
+        deltaMagnitude: deltaMagnitude,
+        isCalibrated: this.isCalibrated,
+        baselineMagnitude: this.baselineMagnitude,
       };
       
       console.log('[SeeedSense] Position data created:', { x: positionData.x.toFixed(4), y: positionData.y.toFixed(4), z: positionData.z.toFixed(4) });
@@ -89,12 +140,25 @@ class SeeedSenseDriver extends BaseDriver {
       console.log(`Buffer filling: ${this.positionBuffer.length}/${this.positionBufferSize}`);
 
       if (this.positionBuffer.length < this.positionBufferSize) {
-        return { brokeThreshold: false, thresholdPct: 0 }; 
+        // Buffer not full yet, but still return motion metrics for fusion
+        console.log('[SeeedSense] 🔄 Buffering... returning motion metrics:', {
+          deltaMagnitude: deltaMagnitude.toFixed(3),
+          magnitude: magnitude.toFixed(3),
+          isCalibrated: this.isCalibrated
+        });
+        return { 
+          brokeThreshold: false, 
+          thresholdPct: 0,
+          deltaMagnitude,
+          magnitude,
+          isCalibrated: this.isCalibrated
+        }; 
       }
 
       if (plotWindow) {
         // Send the motion data to the plot window
-        plotWindow.webContents.send("plot-serial-data", {
+        plotWindow.webContents.send("plot-pos-data", {
+        name: this.deviceInfo.name ?? this.deviceType,
           x: positionData.x,
           y: positionData.y,
           z: positionData.z,
@@ -124,15 +188,24 @@ class SeeedSenseDriver extends BaseDriver {
         deltaX ** 2 + deltaY ** 2 + deltaZ ** 2
       );
 
-      // Check if motion magnitude exceeds the threshold
+      // Check if motion magnitude exceeds the threshold (OLD METHOD - kept for compatibility)
       console.log("[SeeedSense] Motion Mag:", motionMagnitude.toFixed(4), "Threshold: 2, Current tolerance:", this.tolerance);
 
-      if (motionMagnitude > 2) {
-        console.log("[SeeedSense] ⚡ BROKE THRESHOLD! Motion Mag:", motionMagnitude.toFixed(4));
-        return { brokeThreshold: true, thresholdPct: 1 }; 
+      // NEW METHOD: Use deltaMagnitude for threshold detection
+      const brokeThreshold = deltaMagnitude > this.magnitudeThreshold;
+      const thresholdPct = (deltaMagnitude / this.magnitudeThreshold) * 100;
+      
+      if (brokeThreshold) {
+        console.log(`[SeeedSense] ⚡ MOTION DETECTED! ΔMagnitude: ${deltaMagnitude.toFixed(3)} m/s² (threshold: ${this.magnitudeThreshold.toFixed(3)} m/s²)`);
       }
 
-      return { brokeThreshold: false, thresholdPct: motionMagnitude / this.tolerance };
+      return { 
+        brokeThreshold, 
+        thresholdPct,
+        deltaMagnitude,
+        magnitude: positionData.magnitude,
+        isCalibrated: this.isCalibrated
+      };
     } catch (err) {
       console.error("Error parsing Seeed Sense data:", err, "Data:", data);
       return { brokeThreshold: false, thresholdPct: 0 };
@@ -195,8 +268,9 @@ class SeeedSenseDriver extends BaseDriver {
                 this.bleDataBuffer += data;
                 
                 // Look for complete ACC packets (pattern: ACC,x.xxxx,y.yyyy,z.zzzz)
-                // Use regex to find all complete ACC lines
-                const accPattern = /ACC,[-\d.]+,[-\d.]+,[-\d.]+/g;
+                // Regex matches: optional negative, required digits, optional decimal + digits
+                // This ensures we DON'T match incomplete numbers like just "-"
+                const accPattern = /ACC,-?\d+\.?\d*,-?\d+\.?\d*,-?\d+\.?\d*/g;
                 const matches = this.bleDataBuffer.match(accPattern);
                 
                 if (matches && matches.length > 0) {
