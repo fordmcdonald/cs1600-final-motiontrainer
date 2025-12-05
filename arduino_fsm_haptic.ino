@@ -34,15 +34,19 @@ void playHapticEffect(uint8_t effect) {
   Serial.print("Playing haptic effect #");
   Serial.println(effect);
 
+  #ifndef TESTING
   drv.setWaveform(0, effect);  // effect index
   drv.setWaveform(1, 0);       // end of sequence
   drv.go();
+  #endif
 }
 
 void stopHapticEffect() {
+  #ifndef TESTING
   drv.setWaveform(0, 0);
   drv.setWaveform(1, 0);
   drv.go();
+  #endif
 }
 
 bool configureBLEStack() {
@@ -71,6 +75,7 @@ bool tryInitializeBLE(HapticFSMState &state) {
   } else {
     return false;
   }
+
   #else
   
   if (state.bleInitialized) {
@@ -96,7 +101,9 @@ void ensureAdvertising(HapticFSMState &state) {
     return;
   }
   if (!state.advertising) {
+    #ifndef TESTING
     BLE.advertise();
+    #endif
     state.advertising = true;
     Serial.println("BLE peripheral advertising as UnoR4-Haptic");
   }
@@ -215,7 +222,9 @@ void setup() {
   #ifdef TESTING
   testAll()
   while(true);
+  
   #else
+
   if (!drv.begin()) {
     Serial.println("Could not find DRV2605, check wiring!");
     while (1) {
