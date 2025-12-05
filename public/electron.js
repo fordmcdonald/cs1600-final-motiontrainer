@@ -219,7 +219,7 @@ function createWindow() {
 }
 
 async function initializeDevices(ipc) {
-  // Initialize BLE LED Controller (for Arduino LED trigger)
+  // Initialize BLE Haptic Controller (for Arduino Haptic trigger)
   bleController = new BLEController();
   
   try {
@@ -234,10 +234,11 @@ async function initializeDevices(ipc) {
   }
 
   // Create BLE trigger callback
-  const bleTrigger = bleController ? () => bleController.flashLED(500) : null;
+  const bleTrigger = bleController ? () => bleController.flashHaptic(500) : null;
+    const bleHeartbeat = bleController ? () => bleController.sendWatchdogHeartbeat() : null;
 
   // Initialize DeviceManager for multi-device support
-  deviceManager = new DeviceManager(settings, mainWindow, plotWindow, bleTrigger, fusionWindow);
+    deviceManager = new DeviceManager(settings, mainWindow, plotWindow, bleTrigger, fusionWindow, bleHeartbeat);
   
   // Set fusion window after it loads (non-blocking)
   if (fusionWindow) {
@@ -282,10 +283,10 @@ async function initializeDevices(ipc) {
         // Keep first device as 'driver' for backwards compatibility
         if (!driver) {
           driver = deviceDriver;
-          selectedDevice = { 
-            port: deviceInfo, 
+          selectedDevice = {
+            port: serializeDeviceInfo(deviceInfo),
             driver: DriverClass.name,
-            type: deviceInfo.type 
+            type: deviceInfo.type,
           };
         }
         
@@ -330,6 +331,49 @@ function extractDeviceId(path, name) {
     // Serial device - use manufacturer or path
     return name || path.split('/').pop();
   }
+}
+
+/**
+ * Prepare device details for IPC transfer by omitting non-cloneable fields
+ * @param {Object} deviceInfo
+ * @returns {Object|null}
+ */
+function serializeDeviceInfo(deviceInfo) {
+  if (!deviceInfo) {
+    return null;
+  }
+
+  const {
+    type = null,
+    path: devicePath = null,
+    manufacturer = null,
+    serialNumber = null,
+    vendorId = null,
+    productId = null,
+    name = null,
+    address = null,
+    rssi = null,
+    id = null,
+    serviceUUID = null,
+    txCharUUID = null,
+    rxCharUUID = null,
+  } = deviceInfo;
+
+  return {
+    type,
+    path: devicePath,
+    manufacturer,
+    serialNumber,
+    vendorId,
+    productId,
+    name,
+    address,
+    rssi,
+    id,
+    serviceUUID,
+    txCharUUID,
+    rxCharUUID,
+  };
 }
 
 // TRIGGER PORT HELPERS
@@ -640,7 +684,15 @@ const handleFetchSettings = (event, configName) => {
 }
 
 const handleFetchDevice = (event) => {
-  return selectedDevice
+  if (!selectedDevice || Object.keys(selectedDevice).length === 0) {
+    return selectedDevice;
+  }
+
+  const { port, ...rest } = selectedDevice;
+  return {
+    ...rest,
+    port: serializeDeviceInfo(port),
+  };
 }
 
 const handleFetchCurrentSettings = (event) => {
