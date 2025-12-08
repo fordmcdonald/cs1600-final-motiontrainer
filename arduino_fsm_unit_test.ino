@@ -100,7 +100,7 @@ bool testTransition(HapticFSMState start,
 /*
  * REPLACE THE FOLLOWING 4 LINES WITH THE GENERATED TEST CASES
  */
-const HapticFSMState testStatesIn[10] = {
+const HapticFSMState testStatesIn[12] = {
   {(HapticState)1, 0, 0, 0, 0, 0, "return false"}, // Test 0
   {(HapticState)1, 0, 0, 0, 0, 0, ""}, // Test 1
   {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 2
@@ -108,38 +108,44 @@ const HapticFSMState testStatesIn[10] = {
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 4
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 5
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 6
-  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 7
-  {(HapticState)4, 0, 0, 1, 1, 1, ""}, // Test 8
-  {(HapticState)4, 0, 0, 1, 1, 1, ""}  // Test 9
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 7
+  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 8
+  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 9
+  {(HapticState)4, 0, 0, 1, 1, 1, ""}, // Test 10
+  {(HapticState)4, 0, 0, 1, 1, 1, ""}  // Test 11
 };
 
-const HapticFSMState testStatesOut[10] = {
+const HapticFSMState testStatesOut[12] = {
   {(HapticState)1, 0, 0, 0, 0, 0, "return false"}, // Test 0
   {(HapticState)2, 1, 1, 0, 0, 0, ""}, // Test 1
   {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 2
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 3
   {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 4
-  {(HapticState)4, 0, 0, 1, 1, 1, ""}, // Test 5
-  {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 6
-  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 7
-  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 8
-  {(HapticState)2, 0, 0, 0, 0, 0, ""}  // Test 9
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 5
+  {(HapticState)4, 0, 0, 1, 1, 1, ""}, // Test 6
+  {(HapticState)2, 0, 0, 0, 0, 0, ""}, // Test 7
+  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 8
+  {(HapticState)4, 0, 0, 1, 0, 1, ""}, // Test 9
+  {(HapticState)3, 0, 0, 1, 0, 0, ""}, // Test 10
+  {(HapticState)2, 0, 0, 0, 0, 0, ""}  // Test 11
 };
 
-const state_inputs testInputs[10] = {
+const state_inputs testInputs[12] = {
   {0, 0, 0, 0, 0, 0}, // Test 0
   {1, 0, 0, 0, 0, 0}, // Test 1
   {0, 0, 0, 0, 0, 0}, // Test 2
   {0, 1, 1, 0, 0, 0}, // Test 3
-  {0, 1, 0, 0, 1, 0}, // Test 4
-  {0, 1, 0, 0, 1, 1}, // Test 5
-  {0, 0, 0, 1, 0, 0}, // Test 6
-  {0, 1, 0, 0, 1, 1}, // Test 7
-  {0, 1, 0, 0, 1, 0}, // Test 8
-  {0, 0, 0, 1, 0, 0}, // Test 9
+  {0, 1, 0, 0, 0, 0}, // Test 4
+  {0, 1, 0, 0, 1, 0}, // Test 5
+  {0, 1, 0, 0, 1, 1}, // Test 6
+  {0, 0, 0, 1, 0, 0}, // Test 7
+  {0, 1, 0, 0, 1, 1}, // Test 8
+  {0, 1, 0, 0, 0, 1}, // Test 9
+  {0, 1, 0, 0, 1, 0}, // Test 10
+  {0, 0, 0, 1, 0, 0}, // Test 11
 };
 
-const int numTests = 10;
+const int numTests = 12;
 
 /*
  * Runs through all the test cases defined above

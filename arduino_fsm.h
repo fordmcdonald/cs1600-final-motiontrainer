@@ -1,4 +1,4 @@
-#define TESTING
+//#define TESTING
 
 // -------------------- FSM DEFINITIONS --------------------
 enum HapticState {
