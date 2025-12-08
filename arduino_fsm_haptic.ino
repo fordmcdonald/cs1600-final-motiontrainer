@@ -219,7 +219,11 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
 
 // -------------------- ARDUINO LIFECYCLE --------------------
 void setup() {
+  #ifdef TESTING
   Serial.begin(9600);
+  #else
+  Serial.begin(115200);
+  #endif
   while (!Serial && millis() < 5000) {
     delay(10);
   }
