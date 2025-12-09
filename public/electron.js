@@ -235,10 +235,10 @@ async function initializeDevices(ipc) {
 
   // Create BLE trigger callback
   const bleTrigger = bleController ? () => bleController.flashHaptic(500) : null;
-    const bleHeartbeat = bleController ? () => bleController.sendWatchdogHeartbeat() : null;
+  const bleHeartbeat = bleController ? () => bleController.sendWatchdogHeartbeat() : null;
 
   // Initialize DeviceManager for multi-device support
-    deviceManager = new DeviceManager(settings, mainWindow, plotWindow, bleTrigger, fusionWindow, bleHeartbeat);
+  deviceManager = new DeviceManager(settings, mainWindow, plotWindow, bleTrigger, fusionWindow, bleHeartbeat);
   
   // Set fusion window after it loads (non-blocking)
   if (fusionWindow) {
