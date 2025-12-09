@@ -25,8 +25,8 @@ class DeviceManager {
     this.onDataCallback = null;
     
     // Fusion settings
-    this.fusionMode = 'maximum';  // 'maximum', 'average', or 'consensus'
-    this.fusionThreshold = 0.2;   // m/s² for fusion detection
+    this.fusionMode = 'average';  // 'maximum', 'average', or 'consensus'
+    this.fusionThreshold = 0.25;   // m/s² for fusion detection
     
     // Calibration tracking
     this.allDevicesCalibrated = false;

@@ -2,6 +2,38 @@
 #include "Adafruit_DRV2605.h"
 #include <ArduinoBLE.h>
 
+// -------------------- WATCHDOG SUPPORT (ADDED) --------------------
+extern "C" void wdtISR(void);
+extern "C" void ourISR(void);
+
+void initWDT();
+void petWDT();
+void updateWarningIndicator();
+
+constexpr uint8_t WATCHDOG_HEARTBEAT_CMD = 0x48;  // 'H'
+constexpr unsigned long WARNING_BLINK_INTERVAL_MS = 250;
+constexpr int WARNING_LED_PIN = LED_BUILTIN;
+constexpr uint8_t WDT_CLOCK_DIV = 0b1000;   // LOCO/4 ≈ 8.192 kHz
+constexpr uint8_t WDT_TIMEOUT_SEL = 0b11;   // 8192 cycles ≈ 1.0 s at LOCO/4
+
+volatile bool gWatchdogFault = false;
+volatile bool gWatchdogPrimed = false;
+unsigned long gWarningBlinkLastToggle = 0;
+bool gWarningBlinkState = false;
+
+
+const unsigned int WDT_INT = 30;
+
+
+const unsigned int D3_PORT = 1;
+const unsigned int D3_PIN = 5;
+
+
+const unsigned int D3_IRQ = 0; 
+
+const unsigned int CPU_INT_1 = 31;
+
+
 // -------------------- HAPTIC (DRV2605) --------------------
 Adafruit_DRV2605 drv;
 
@@ -10,7 +42,7 @@ BLEService hapticService("19B10000-E8F2-537E-4F6C-D104768A1214");
 BLECharacteristic hapticChar(
   "19B10001-E8F2-537E-4F6C-D104768A1214",
   BLEWrite | BLERead,
-  1 
+  1  // 1 byte command channel
 );
 
 // -------------------- FSM DEFINITIONS --------------------
@@ -161,6 +193,7 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
         ret.state = S_ADVERTISING;
         ensureAdvertising(ret);
       }
+      petWDT();
       break;
     }
 
@@ -170,6 +203,7 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
         ret.state = S_CONNECTED_OFF;
         handleConnectionEstablished(ret, inputs.central);
       }
+      petWDT();
       break;
     }
 
@@ -224,6 +258,21 @@ void setup() {
   while (!Serial && millis() < 5000) {
     delay(10);
   }
+
+  // Setting up IRQ on D3
+
+  R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS = R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS & (~R_PFS_PORT_PIN_PmnPFS_ISEL_Msk) | R_PFS_PORT_PIN_PmnPFS_ISEL_Msk;
+
+  R_ICU->IRQCR[D3_IRQ] = 1;
+
+  R_ICU->IELSR[CPU_INT_1] = 1;
+
+
+   NVIC_SetVector((IRQn_Type) CPU_INT_1, (uint32_t) &ourISR);
+   NVIC_SetPriority((IRQn_Type) CPU_INT_1, 13);
+   NVIC_EnableIRQ((IRQn_Type) CPU_INT_1);
+
+
   Serial.println("Setting up BLE + Haptics with FSM...");
 
   if (!drv.begin()) {
@@ -235,6 +284,11 @@ void setup() {
 
   drv.selectLibrary(1);
   drv.setMode(DRV2605_MODE_INTTRIG);
+
+  pinMode(WARNING_LED_PIN, OUTPUT);          // WATCHDOG ADDITION
+  digitalWrite(WARNING_LED_PIN, LOW);        // WATCHDOG ADDITION
+  initWDT();                                 // WATCHDOG ADDITION
+  Serial.println("init done");
 }
 
 void loop() {
@@ -267,8 +321,14 @@ void loop() {
     Serial.print("Got BLE value: ");
     Serial.println(value);
 
-    thresholdActive = value > 0;
-    thresholdUpdated = true;
+    if (value == WATCHDOG_HEARTBEAT_CMD) {       // WATCHDOG ADDITION
+      petWDT();                                  // WATCHDOG ADDITION
+      thresholdUpdated = false;                  // WATCHDOG ADDITION
+      thresholdActive = fsmState.thresholdActive;  // WATCHDOG ADDITION
+    } else {
+      thresholdActive = value > 0;
+      thresholdUpdated = true;
+    }
   }
 
   HapticInputs inputs = {
@@ -283,4 +343,67 @@ void loop() {
   fsmState = updateFSM(fsmState, inputs);
 
   delay(10);
+}
+
+// -------------------- WATCHDOG IMPLEMENTATION --------------------
+void initWDT() {
+  // Configure Watchdog Timer (interrupt on underflow, ~1.0 s periodd
+
+  R_WDT->WDTCR =
+    (0b1000 << R_WDT_WDTCR_CKS_Pos) |   // PCLKB/8192
+    (0b11   << R_WDT_WDTCR_TOPS_Pos) |  // 8192 cycles
+    (0b11   << R_WDT_WDTCR_RPSS_Pos) |
+    (0b11   << R_WDT_WDTCR_RPES_Pos);
+
+  Serial.print("WDTCR = 0x");
+  Serial.println(R_WDT->WDTCR, HEX);
+
+  R_WDT->WDTSR = 0;                       // Clear status flags
+  R_WDT->WDTRCR = 0;                      // Disable hardware reset on underflow
+
+  R_ICU->IELSR[WDT_INT] = 0x025;          // Map WDT to ICU interrupt line
+  NVIC_SetVector((IRQn_Type)WDT_INT, (uint32_t)wdtISR);
+  NVIC_SetPriority((IRQn_Type)WDT_INT, 14);
+  NVIC_EnableIRQ((IRQn_Type)WDT_INT);
+
+  petWDT();
+}
+
+void petWDT() {
+
+
+  R_WDT->WDTRR = 0x00;
+  R_WDT->WDTRR = 0xFF;
+}
+
+
+extern "C" void ourISR(void) {
+
+  Serial.println("ourISR running...");
+  // Drive built-in LED LOW immediately
+  analogWrite(WARNING_LED_PIN, 0);
+
+  static int timesPushed = 0; // static means value persists between function calls
+  Serial.println(timesPushed++);
+
+  // TODO: Clear the pending interrupt flag (Prelab Q4.8) on the MCU side
+  R_ICU->IELSR_b[CPU_INT_1].IR = 0;
+  // Clear the pending interrupt on the CPU side
+  NVIC_ClearPendingIRQ((IRQn_Type) CPU_INT_1);
+
+  while(true) {
+  }
+
+}
+
+extern "C" void wdtISR(void) {
+  // petWDT(); 
+  // gWatchdogFault = true;
+  Serial.println("WOOF");
+  while(true) {
+    for (int i = 0; i < 256; i+= 10) {
+      analogWrite(WARNING_LED_PIN, i);
+      delay(100);
+    }
+  }
 }
