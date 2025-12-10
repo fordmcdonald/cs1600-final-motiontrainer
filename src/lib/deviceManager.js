@@ -4,28 +4,49 @@
  */
 
 class DeviceManager {
-  constructor(settings, mainWindow, plotWindow, bleTriggerCallback, fusionWindow = null) {
+  constructor(settings, mainWindow, plotWindow, bleTriggerCallback, fusionWindow = null, bleHeartbeatCallback = null) {
     this.settings = settings;
     this.mainWindow = mainWindow;
     this.plotWindow = plotWindow;
     this.bleTriggerCallback = bleTriggerCallback;
     this.fusionWindow = fusionWindow;
+    this.bleHeartbeatCallback = bleHeartbeatCallback;
     
     // Map of device ID -> driver instance
     this.drivers = new Map();
     
     // Map of device ID -> latest sensor data
     this.latestData = new Map();
+
+    // Map of device ID -> last packet timestamp (ms)
+    this.deviceLastPacket = new Map();
     
     // Callback for when data is received from any device
     this.onDataCallback = null;
     
     // Fusion settings
-    this.fusionMode = 'maximum';  // 'maximum', 'average', or 'consensus'
-    this.fusionThreshold = 0.2;   // m/s² for fusion detection
+    this.fusionMode = 'average';  // 'maximum', 'average', or 'consensus'
+    this.fusionThreshold = 0.25;   // m/s² for fusion detection
     
     // Calibration tracking
     this.allDevicesCalibrated = false;
+
+    // Watchdog / heartbeat configuration
+    this.watchdogSettings = {
+      enabled: Boolean(this.bleHeartbeatCallback),
+      intervalMs: settings?.watchdog?.heartbeatIntervalMs ?? 250,
+      timeoutMs: settings?.watchdog?.timeoutMs ?? 750,
+      warmupMs: settings?.watchdog?.warmupMs ?? 5000,
+    };
+    this.watchdogTimer = null;
+    this.watchdogLastState = 'unknown';
+    this.watchdogArmedAt = Date.now();
+    this.pendingHeartbeat = null;
+
+    // Begin watchdog loop immediately so the Arduino stays alive while devices connect
+    if (this.watchdogSettings.enabled) {
+      this.startWatchdogIfNeeded();
+    }
   }
 
   /**
@@ -37,6 +58,10 @@ class DeviceManager {
     console.log(`[DeviceManager] Adding device: ${deviceId}`);
     this.drivers.set(deviceId, driver);
     this.latestData.set(deviceId, null);
+    this.deviceLastPacket.set(deviceId, Date.now());
+
+    // Re-arm watchdog warmup window whenever a new device comes online
+    this.watchdogArmedAt = Date.now();
     
     // Wrap the driver's handleData to track which device sent data
     const originalHandleData = driver.handleData.bind(driver);
@@ -53,6 +78,9 @@ class DeviceManager {
         rawData: data,
         ...result  // Includes deltaMagnitude, magnitude, brokeThreshold, etc.
       });
+
+      // Track last packet receipt for watchdog heartbeat
+      this.deviceLastPacket.set(deviceId, Date.now());
       
       // Perform fusion calculation
       this.performFusion();
@@ -62,6 +90,9 @@ class DeviceManager {
         this.onDataCallback(deviceId, data);
       }
     };
+
+    // Ensure watchdog loop is running when enabled
+    this.startWatchdogIfNeeded();
   }
   
   /**
@@ -189,6 +220,106 @@ class DeviceManager {
   }
 
   /**
+   * Start watchdog heartbeat loop if required
+   */
+  startWatchdogIfNeeded() {
+    if (!this.watchdogSettings.enabled) return;
+    if (this.watchdogTimer) return;
+
+    console.log('[DeviceManager] 🫀 Watchdog heartbeat enabled', {
+      intervalMs: this.watchdogSettings.intervalMs,
+      timeoutMs: this.watchdogSettings.timeoutMs,
+      warmupMs: this.watchdogSettings.warmupMs,
+    });
+
+    this.watchdogArmedAt = Date.now();
+    this.watchdogTimer = setInterval(() => this.evaluateWatchdog(), this.watchdogSettings.intervalMs);
+  }
+
+  /**
+   * Stop watchdog loop (e.g., on shutdown)
+   */
+  stopWatchdog() {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+      this.watchdogLastState = 'unknown';
+      this.pendingHeartbeat = null;
+    }
+  }
+
+  /**
+   * Evaluate sensor health and pet watchdog if all devices are responsive
+   */
+  evaluateWatchdog() {
+    if (!this.watchdogSettings.enabled) return;
+    if (this.drivers.size === 0) {
+      if (this.watchdogLastState !== 'idle') {
+        console.log('[DeviceManager] ⏳ Watchdog waiting for sensors to initialize');
+      }
+      this.petWatchdog();
+      console.log('[DeviceManager] Petting watchdog in idle state ');
+      this.watchdogLastState = 'idle';
+      return;
+    }
+
+    const now = Date.now();
+    const staleDevices = [];
+    const { timeoutMs, warmupMs } = this.watchdogSettings;
+    const warmupActive = now - this.watchdogArmedAt < warmupMs;
+
+    this.drivers.forEach((_, deviceId) => {
+      const lastPacket = this.deviceLastPacket.get(deviceId);
+      if (!lastPacket) {
+        if (!warmupActive) {
+          staleDevices.push(deviceId);
+        }
+        return;
+      }
+
+      if (!warmupActive && now - lastPacket > timeoutMs) {
+        staleDevices.push(deviceId);
+      }
+    });
+
+    if (staleDevices.length === 0) {
+      if (this.watchdogLastState !== 'healthy') {
+        console.log('[DeviceManager] 🟢 Watchdog healthy – petting heartbeat');
+      }
+      this.petWatchdog();
+      this.watchdogLastState = 'healthy';
+    } else {
+      if (this.watchdogLastState !== 'stale') {
+        console.warn('[DeviceManager] 🛑 Watchdog detected stale sensor(s):', staleDevices);
+      }
+      this.watchdogLastState = 'stale';
+    }
+  }
+
+  /**
+   * Pet the external watchdog via BLE heartbeat callback
+   */
+  petWatchdog() {
+    if (!this.bleHeartbeatCallback) return;
+    if (this.pendingHeartbeat) return;
+
+    try {
+      const maybePromise = this.bleHeartbeatCallback();
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        this.pendingHeartbeat = maybePromise
+          .catch((err) => {
+            console.error('[DeviceManager] Watchdog heartbeat error:', err);
+          })
+          .finally(() => {
+            this.pendingHeartbeat = null;
+          });
+      }
+    } catch (err) {
+      console.error('[DeviceManager] Watchdog heartbeat threw synchronously:', err);
+    }
+  }
+
+  /**
    * Remove a device driver
    * @param {string} deviceId - Device identifier
    */
@@ -200,6 +331,11 @@ class DeviceManager {
     }
     this.drivers.delete(deviceId);
     this.latestData.delete(deviceId);
+    this.deviceLastPacket.delete(deviceId);
+
+    if (this.drivers.size === 0) {
+      this.stopWatchdog();
+    }
   }
 
   /**
@@ -266,6 +402,14 @@ class DeviceManager {
   }
 
   /**
+   * Get all drivers as an array
+   * @returns Array of driver classes
+   */
+  getAllDrivers() {
+    return Array.from(this.drivers.values());
+  }
+
+  /**
    * Close all devices
    */
   closeAll() {
@@ -273,6 +417,7 @@ class DeviceManager {
     this.drivers.forEach((driver, deviceId) => {
       this.removeDevice(deviceId);
     });
+    this.stopWatchdog();
   }
 }
 

@@ -139,25 +139,26 @@ class SeeedSenseDriver extends BaseDriver {
 
       console.log(`Buffer filling: ${this.positionBuffer.length}/${this.positionBufferSize}`);
 
-      if (this.positionBuffer.length < this.positionBufferSize) {
-        // Buffer not full yet, but still return motion metrics for fusion
-        console.log('[SeeedSense] 🔄 Buffering... returning motion metrics:', {
-          deltaMagnitude: deltaMagnitude.toFixed(3),
-          magnitude: magnitude.toFixed(3),
-          isCalibrated: this.isCalibrated
-        });
-        return { 
-          brokeThreshold: false, 
-          thresholdPct: 0,
-          deltaMagnitude,
-          magnitude,
-          isCalibrated: this.isCalibrated
-        }; 
-      }
+      // if (this.positionBuffer.length < this.positionBufferSize) {
+      //   // Buffer not full yet, but still return motion metrics for fusion
+      //   console.log('[SeeedSense] 🔄 Buffering... returning motion metrics:', {
+      //     deltaMagnitude: deltaMagnitude.toFixed(3),
+      //     magnitude: magnitude.toFixed(3),
+      //     isCalibrated: this.isCalibrated
+      //   });
+      //   return { 
+      //     brokeThreshold: false, 
+      //     thresholdPct: 0,
+      //     deltaMagnitude,
+      //     magnitude,
+      //     isCalibrated: this.isCalibrated
+      //   }; 
+      // }
 
       if (plotWindow) {
         // Send the motion data to the plot window
-        plotWindow.webContents.send("plot-serial-data", {
+        plotWindow.webContents.send("plot-pos-data", {
+        name: this.deviceInfo.name ?? this.deviceType,
           x: positionData.x,
           y: positionData.y,
           z: positionData.z,
