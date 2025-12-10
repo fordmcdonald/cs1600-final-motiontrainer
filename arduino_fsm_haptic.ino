@@ -258,31 +258,27 @@ void setup() {
   #else
   Serial.begin(115200);
   #endif
+
   while (!Serial && millis() < 5000) {
     delay(10);
   }
-
-  // Setting up IRQ on D3
-
-  R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS = R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS & (~R_PFS_PORT_PIN_PmnPFS_ISEL_Msk) | R_PFS_PORT_PIN_PmnPFS_ISEL_Msk;
-
-  R_ICU->IRQCR[D3_IRQ] = 1;
-
-  R_ICU->IELSR[CPU_INT_1] = 1;
-
-
-   NVIC_SetVector((IRQn_Type) CPU_INT_1, (uint32_t) &ourISR);
-   NVIC_SetPriority((IRQn_Type) CPU_INT_1, 13);
-   NVIC_EnableIRQ((IRQn_Type) CPU_INT_1);
-
-
-  Serial.println("Setting up BLE + Haptics with FSM...");
 
   #ifdef TESTING
   testAll();
   while(true);
   
   #else
+  // Setting up IRQ on D3
+  R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS = R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS & (~R_PFS_PORT_PIN_PmnPFS_ISEL_Msk) | R_PFS_PORT_PIN_PmnPFS_ISEL_Msk;
+  R_ICU->IRQCR[D3_IRQ] = 1;
+  R_ICU->IELSR[CPU_INT_1] = 1;
+
+  NVIC_SetVector((IRQn_Type) CPU_INT_1, (uint32_t) &ourISR);
+  NVIC_SetPriority((IRQn_Type) CPU_INT_1, 13);
+  NVIC_EnableIRQ((IRQn_Type) CPU_INT_1);
+
+
+  Serial.println("Setting up BLE + Haptics with FSM...");
 
   if (!drv.begin()) {
     Serial.println("Could not find DRV2605, check wiring!");
@@ -380,10 +376,10 @@ void initWDT() {
 }
 
 void petWDT() {
-
-
+  #ifndef TESTING
   R_WDT->WDTRR = 0x00;
   R_WDT->WDTRR = 0xFF;
+  #endif
 }
 
 
