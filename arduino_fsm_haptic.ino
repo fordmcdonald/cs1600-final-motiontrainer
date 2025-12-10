@@ -1,6 +1,11 @@
 #include <Wire.h>
-#include "Adafruit_DRV2605.h"
 #include <ArduinoBLE.h>
+
+#include "arduino_fsm.h"
+
+#ifndef TESTING
+#include "Adafruit_DRV2605.h"
+#endif
 
 // -------------------- WATCHDOG SUPPORT (ADDED) --------------------
 extern "C" void wdtISR(void);
@@ -35,7 +40,9 @@ const unsigned int CPU_INT_1 = 31;
 
 
 // -------------------- HAPTIC (DRV2605) --------------------
+#ifndef TESTING
 Adafruit_DRV2605 drv;
+#endif
 
 // -------------------- BLE --------------------
 BLEService hapticService("19B10000-E8F2-537E-4F6C-D104768A1214");
@@ -45,33 +52,7 @@ BLECharacteristic hapticChar(
   1  // 1 byte command channel
 );
 
-// -------------------- FSM DEFINITIONS --------------------
-enum HapticState {
-  S_INIT = 0,
-  S_ADVERTISING,
-  S_CONNECTED_OFF,
-  S_CONNECTED_ON
-};
-
-struct HapticFSMState {
-  HapticState state;
-  bool bleInitialized;
-  bool advertising;
-  bool centralConnected;
-  bool motorOn;
-  bool thresholdActive;
-  String centralAddress;
-};
-
-struct HapticInputs {
-  bool centralConnected;
-  bool centralJustConnected;
-  bool centralJustDisconnected;
-  bool thresholdActive;
-  bool thresholdUpdated;
-  BLEDevice central;
-};
-
+// -------------------- FSM Static Variables --------------------
 static HapticFSMState fsmState = {
   S_INIT,
   false,   // bleInitialized
@@ -90,15 +71,19 @@ void playHapticEffect(uint8_t effect) {
   Serial.print("Playing haptic effect #");
   Serial.println(effect);
 
+  #ifndef TESTING
   drv.setWaveform(0, effect);  // effect index
   drv.setWaveform(1, 0);       // end of sequence
   drv.go();
+  #endif
 }
 
 void stopHapticEffect() {
+  #ifndef TESTING
   drv.setWaveform(0, 0);
   drv.setWaveform(1, 0);
   drv.go();
+  #endif
 }
 
 bool configureBLEStack() {
@@ -120,6 +105,17 @@ bool configureBLEStack() {
 }
 
 bool tryInitializeBLE(HapticFSMState &state) {
+  #ifdef TESTING
+  // Use centralAddress variable to mock tryInitializeBLE behavior in FSM unit test
+  if (state.centralAddress == "") {
+    state.bleInitialized = true;
+    return true;
+  } else {
+    return false;
+  }
+
+  #else
+  
   if (state.bleInitialized) {
     return true;
   }
@@ -135,6 +131,7 @@ bool tryInitializeBLE(HapticFSMState &state) {
   state.bleInitialized = true;
   Serial.println("BLE initialization successful");
   return true;
+  #endif
 }
 
 void ensureAdvertising(HapticFSMState &state) {
@@ -142,7 +139,9 @@ void ensureAdvertising(HapticFSMState &state) {
     return;
   }
   if (!state.advertising) {
+    #ifndef TESTING
     BLE.advertise();
+    #endif
     state.advertising = true;
     Serial.println("BLE peripheral advertising as UnoR4-Haptic");
   }
@@ -254,7 +253,11 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
 
 // -------------------- ARDUINO LIFECYCLE --------------------
 void setup() {
+  #ifdef TESTING
+  Serial.begin(9600);
+  #else
   Serial.begin(115200);
+  #endif
   while (!Serial && millis() < 5000) {
     delay(10);
   }
@@ -275,6 +278,12 @@ void setup() {
 
   Serial.println("Setting up BLE + Haptics with FSM...");
 
+  #ifdef TESTING
+  testAll();
+  while(true);
+  
+  #else
+
   if (!drv.begin()) {
     Serial.println("Could not find DRV2605, check wiring!");
     while (1) {
@@ -289,6 +298,7 @@ void setup() {
   digitalWrite(WARNING_LED_PIN, LOW);        // WATCHDOG ADDITION
   initWDT();                                 // WATCHDOG ADDITION
   Serial.println("init done");
+  #endif
 }
 
 void loop() {
