@@ -84,10 +84,10 @@ class SeeedSenseDriver extends BaseDriver {
           const stdDev = Math.sqrt(variance);
           
           // Set threshold at 3x standard deviation (captures 99.7% of noise)
-          this.magnitudeThreshold = Math.max(0.15, 3 * stdDev);  // Minimum 0.15 m/s²
+          this.magnitudeThreshold = Math.max(0.15, 10 * stdDev);  // Minimum 0.15 m/s²
           
           this.isCalibrated = true;
-          console.log(`[SeeedSense] ✅ Calibrated: baseline=${this.baselineMagnitude.toFixed(2)} m/s², threshold=${this.magnitudeThreshold.toFixed(3)} m/s²`);
+          console.log(`[SeeedSense] Calibrated: baseline=${this.baselineMagnitude.toFixed(2)} m/s², threshold=${this.magnitudeThreshold.toFixed(3)} m/s²`);
         } else {
           console.log(`[SeeedSense] Calibrating... ${this.calibrationSamples.length}/${this.calibrationSampleCount}`);
         }
@@ -139,9 +139,9 @@ class SeeedSenseDriver extends BaseDriver {
 
       console.log(`Buffer filling: ${this.positionBuffer.length}/${this.positionBufferSize}`);
 
-      // if (this.positionBuffer.length < this.positionBufferSize) {
-      //   // Buffer not full yet, but still return motion metrics for fusion
-      //   console.log('[SeeedSense] 🔄 Buffering... returning motion metrics:', {
+  // if (this.positionBuffer.length < this.positionBufferSize) {
+  //   // Buffer not full yet, but still return motion metrics for fusion
+  //   console.log('[SeeedSense] Buffering... returning motion metrics:', {
       //     deltaMagnitude: deltaMagnitude.toFixed(3),
       //     magnitude: magnitude.toFixed(3),
       //     isCalibrated: this.isCalibrated
@@ -196,7 +196,7 @@ class SeeedSenseDriver extends BaseDriver {
       const thresholdPct = (deltaMagnitude / this.magnitudeThreshold) * 100;
       
       if (brokeThreshold) {
-        console.log(`[SeeedSense] ⚡ MOTION DETECTED! ΔMagnitude: ${deltaMagnitude.toFixed(3)} m/s² (threshold: ${this.magnitudeThreshold.toFixed(3)} m/s²)`);
+        console.log(`[SeeedSense] MOTION DETECTED! ΔMagnitude: ${deltaMagnitude.toFixed(3)} m/s² (threshold: ${this.magnitudeThreshold.toFixed(3)} m/s²)`);
       }
 
       return { 
@@ -262,7 +262,7 @@ class SeeedSenseDriver extends BaseDriver {
               // Handle incoming data
               this.bleCharacteristic.on('data', (buffer) => {
                 const data = buffer.toString('utf8');
-                console.log('[SeeedSense] 🔵 BLE data received:', data);
+                console.log('[SeeedSense] BLE data received:', data);
                 
                 // Buffer data
                 this.bleDataBuffer += data;
@@ -294,7 +294,7 @@ class SeeedSenseDriver extends BaseDriver {
                 
                 // Prevent buffer from growing too large
                 if (this.bleDataBuffer.length > 500) {
-                  console.log('[SeeedSense] ⚠️ Buffer overflow, resetting');
+                  console.log('[SeeedSense] Buffer overflow, resetting');
                   this.bleDataBuffer = '';
                 }
               });

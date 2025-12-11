@@ -47,7 +47,7 @@ class BaseDriver {
         const {brokeThreshold, thresholdPct } = parseResult;
         console.log('[BaseDriver] parseData returned - brokeThreshold:', brokeThreshold, 'thresholdPct:', thresholdPct);
         if (brokeThreshold && this.renderer) {
-            console.log("[BaseDriver] ⚡ THRESHOLD BROKEN! Triggering callbacks...");
+            console.log("[BaseDriver] THRESHOLD BROKEN! Triggering callbacks...");
             this.renderer.webContents.send('serial-data', brokeThreshold)
             console.log("[BaseDriver] BLE callback available:", !!this.bleTriggerCallback);
             // Trigger BLE if callback is available and cooldown has elapsed
@@ -56,11 +56,11 @@ class BaseDriver {
                 const cooldownElapsed = now - this.lastTriggerTime >= this.triggerCooldown;
                 console.log("[BaseDriver] Cooldown check - elapsed:", cooldownElapsed, "ms since last:", now - this.lastTriggerTime);
                 if (cooldownElapsed) {
-                    console.log("[BaseDriver] 🔥 Triggering BLE LED flash...");
+                    console.log("[BaseDriver] Triggering BLE LED flash...");
                     this.lastTriggerTime = now;
                     this.bleTriggerCallback()
-                        .then(() => console.log('[BaseDriver] ✅ BLE trigger sent successfully'))
-                        .catch(err => console.error('[BaseDriver] ❌ BLE trigger failed:', err));
+                        .then(() => console.log('[BaseDriver] BLE trigger sent successfully'))
+                        .catch(err => console.error('[BaseDriver] BLE trigger failed:', err));
                 } else {
                     console.log("[BaseDriver] Skipping trigger - cooldown active");
                 }
