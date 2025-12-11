@@ -291,7 +291,7 @@ async function initializeDevices(ipc) {
         }
         
         devicesInitialized++;
-        console.log(`[Electron] ✓ ${deviceId} initialized (${DriverClass.name})`);
+  console.log(`[Electron] ${deviceId} initialized (${DriverClass.name})`);
       } catch (error) {
         console.error(`[Electron] Error initializing driver for ${path}:`, error);
       }
@@ -304,13 +304,13 @@ async function initializeDevices(ipc) {
       console.log(`[Electron] Data from ${deviceId}: ${data.substring(0, 60)}${data.length > 60 ? '...' : ''}`);
     });
 
-    console.log(`[Electron] ✅ Initialized ${devicesInitialized} device(s) successfully`);
+  console.log(`[Electron] Initialized ${devicesInitialized} device(s) successfully`);
     console.log(`[Electron] Active devices:`, deviceManager.getActiveDevices());
 
     // Set up settings handler for all devices
     ipc.on("set-settings", (event, settings, config, saveToFile) => handleSetSettings(event, settings, config, saveToFile, driver));
   } else {
-    console.warn('[Electron] ⚠️  No devices initialized');
+    console.warn('[Electron] No devices initialized');
   }
 }
 

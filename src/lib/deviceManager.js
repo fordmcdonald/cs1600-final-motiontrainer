@@ -69,7 +69,7 @@ class DeviceManager {
       // Call original handler
       const result = originalHandleData(data);
       
-      console.log(`[DeviceManager] 📊 Motion metrics from ${deviceId}:`, result);
+  console.log(`[DeviceManager] Motion metrics from ${deviceId}:`, result);
       
       // Store latest data from this device with motion metrics
       this.latestData.set(deviceId, {
@@ -104,7 +104,7 @@ class DeviceManager {
     
     if (deviceData.length === 0) return;
     
-    console.log(`[DeviceManager] 🔗 Fusion input (${deviceData.length} devices):`, 
+    console.log(`[DeviceManager] Fusion input (${deviceData.length} devices):`, 
       deviceData.map(d => ({
         id: d.deviceId,
         delta: d.deltaMagnitude,
@@ -117,7 +117,7 @@ class DeviceManager {
     const allCalibrated = deviceData.every(d => d.isCalibrated);
     if (allCalibrated && !this.allDevicesCalibrated) {
       this.allDevicesCalibrated = true;
-      console.log('[DeviceManager] ✅ All devices calibrated! Fusion active.');
+  console.log('[DeviceManager] All devices calibrated! Fusion active.');
     }
     
     // Extract motion metrics from each device
@@ -182,7 +182,7 @@ class DeviceManager {
     
     // Send to fusion window if available
     if (this.fusionWindow && this.fusionWindow.webContents) {
-      console.log('[DeviceManager] 📤 Sending fusion data to window:', {
+      console.log('[DeviceManager] Sending fusion data to window:', {
         fusedDelta: fusedData.fusedDeltaMagnitude.toFixed(3),
         devices: fusedData.devices.map(d => ({
           id: d.deviceId,
@@ -195,7 +195,7 @@ class DeviceManager {
     
     // Log motion events
     if (fusedBrokeThreshold && allCalibrated) {
-      console.log(`[DeviceManager] 🎯 FUSED MOTION DETECTED! ΔMag: ${fusedDeltaMagnitude.toFixed(3)} m/s² (${this.fusionMode} of ${deviceData.length} devices)`);
+  console.log(`[DeviceManager] FUSED MOTION DETECTED! ΔMag: ${fusedDeltaMagnitude.toFixed(3)} m/s² (${this.fusionMode} of ${deviceData.length} devices)`);
     }
   }
   
@@ -226,7 +226,7 @@ class DeviceManager {
     if (!this.watchdogSettings.enabled) return;
     if (this.watchdogTimer) return;
 
-    console.log('[DeviceManager] 🫀 Watchdog heartbeat enabled', {
+    console.log('[DeviceManager] Watchdog heartbeat enabled', {
       intervalMs: this.watchdogSettings.intervalMs,
       timeoutMs: this.watchdogSettings.timeoutMs,
       warmupMs: this.watchdogSettings.warmupMs,
@@ -255,10 +255,10 @@ class DeviceManager {
     if (!this.watchdogSettings.enabled) return;
     if (this.drivers.size === 0) {
       if (this.watchdogLastState !== 'idle') {
-        console.log('[DeviceManager] ⏳ Watchdog waiting for sensors to initialize');
+  console.log('[DeviceManager] Watchdog waiting for sensors to initialize');
       }
       this.petWatchdog();
-      console.log('[DeviceManager] Petting watchdog in idle state ');
+  console.log('[DeviceManager] Petting watchdog in idle state ');
       this.watchdogLastState = 'idle';
       return;
     }
@@ -284,13 +284,13 @@ class DeviceManager {
 
     if (staleDevices.length === 0) {
       if (this.watchdogLastState !== 'healthy') {
-        console.log('[DeviceManager] 🟢 Watchdog healthy – petting heartbeat');
+  console.log('[DeviceManager] Watchdog healthy – petting heartbeat');
       }
       this.petWatchdog();
       this.watchdogLastState = 'healthy';
     } else {
       if (this.watchdogLastState !== 'stale') {
-        console.warn('[DeviceManager] 🛑 Watchdog detected stale sensor(s):', staleDevices);
+  console.warn('[DeviceManager] Watchdog detected stale sensor(s):', staleDevices);
       }
       this.watchdogLastState = 'stale';
     }

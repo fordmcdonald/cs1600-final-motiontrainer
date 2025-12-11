@@ -158,7 +158,7 @@ class DeviceScanner {
         // Match by exact name first (XIAO-IMU)
         if (deviceName === 'XIAO-IMU') {
           if (!foundDevices.find(d => d.id === peripheral.id)) {
-            console.log(`[DeviceScanner] ✓ Found XIAO-IMU by name! (RSSI: ${rssi}, id: ${peripheral.id})`);
+            console.log(`[DeviceScanner] Found XIAO-IMU by name! (RSSI: ${rssi}, id: ${peripheral.id})`);
             
             foundDevices.push({
               type: 'ble',
@@ -180,9 +180,9 @@ class DeviceScanner {
           
           const alreadyFound = foundDevices.find(d => d.id === peripheral.id);
           if (alreadyFound) {
-            console.log(`[DeviceScanner] ⚠️  ${deviceName} already in list (id: ${peripheral.id}, existing: ${alreadyFound.name})`);
+            console.log(`[DeviceScanner] ${deviceName} already in list (id: ${peripheral.id}, existing: ${alreadyFound.name})`);
           } else {
-            console.log(`[DeviceScanner] ✓ Found BLE device by name: ${deviceName} (RSSI: ${rssi}, id: ${peripheral.id})`);
+            console.log(`[DeviceScanner] Found BLE device by name: ${deviceName} (RSSI: ${rssi}, id: ${peripheral.id})`);
             
             foundDevices.push({
               type: 'ble',
@@ -203,7 +203,7 @@ class DeviceScanner {
           const deviceKey = deviceName || `Nordic-UART-${peripheral.address.slice(-8)}`;
           
           if (!foundDevices.find(d => d.id === peripheral.id)) {
-            console.log(`[DeviceScanner] ✓ Found Nordic UART device: ${deviceKey} (RSSI: ${rssi}, id: ${peripheral.id})`);
+            console.log(`[DeviceScanner] Found Nordic UART device: ${deviceKey} (RSSI: ${rssi}, id: ${peripheral.id})`);
             
             foundDevices.push({
               type: 'ble',
