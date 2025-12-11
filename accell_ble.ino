@@ -11,6 +11,11 @@ BLEUart bleuart;
 // Forward declaration
 void startAdv();
 
+// setup(): Initialize Serial, IMU (LSM6DS3), BLE stack, UART service, and start advertising.
+// Inputs: none
+// Outputs: none
+// Side effects: Configures Bluefruit name/tx power, begins BLEUart.
+
 void setup() {
   // Debug serial
   Serial.begin(115200);
@@ -20,9 +25,6 @@ void setup() {
   Serial.println("-----------------------------");
 
   // ----- IMU INIT -----
-  // If you are on XIAO nRF52840 Sense/Plus and need Wire1, you might need:
-  // Wire1.begin(); and a version of LSM6DS3 that can be pointed at Wire1.
-  // But since your original code works, we keep it as-is.
   if (myIMU.begin() != 0) {
     Serial.println("IMU Device error");
   } else {
@@ -31,8 +33,8 @@ void setup() {
 
   // ----- BLE INIT -----
   Bluefruit.begin();
-  Bluefruit.setName("XIAO-IMU");  // Name that shows up on your phone
-  Bluefruit.setTxPower(4);        // 0–8 dBm typically supported
+  Bluefruit.setName("XIAO-IMU-1");  // Name that shows up in device registry
+  Bluefruit.setTxPower(4);        
 
   // Start BLE UART service
   bleuart.begin();
@@ -59,6 +61,11 @@ void startAdv() {
   Serial.println("Advertising as XIAO-IMU (BLE UART)...");
 }
 
+// startAdv(): Configure advertising and scan response for BLE UART and device name, then start.
+// Inputs: none
+// Outputs: none
+// Side effects: Starts advertising indefinitely with restart on disconnect.
+
 void loop() {
   // Read accelerometer
   float ax = myIMU.readFloatAccelX();
@@ -75,8 +82,6 @@ void loop() {
 
   // Only send over BLE if connected
   if (Bluefruit.connected()) {
-    // Format as CSV or simple string
-    // e.g. "AX,AY,AZ\n"
     char buf[64];
     snprintf(buf, sizeof(buf), "ACC,%.4f,%.4f,%.4f\r\n", ax, ay, az);
 
@@ -84,5 +89,10 @@ void loop() {
     bleuart.write((uint8_t*)buf, strlen(buf));
   }
 
-  delay(100); // ~10 Hz sample rate
+  delay(100); 
 }
+
+// loop(): Sample accel at ~10 Hz and stream over BLE UART when connected.
+// Inputs: none
+// Outputs: none
+// Side effects: Sends formatted ACC CSV lines via BLE UART.
