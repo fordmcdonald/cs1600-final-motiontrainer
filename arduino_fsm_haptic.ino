@@ -1,5 +1,4 @@
 #include <Wire.h>
-#include "Adafruit_DRV2605.h"
 #include <ArduinoBLE.h>
 
 // setup(): Arduino entry point. Initializes Serial, IRQ on D3, DRV2605, BLE, and watchdog.
@@ -7,6 +6,13 @@
 // Outputs: none
 // Side effects: Configures hardware peripherals, starts BLE advertising, primes WDT.
 
+#include "arduino_fsm.h"
+
+#ifndef TESTING
+#include "Adafruit_DRV2605.h"
+#endif
+
+// -------------------- WATCHDOG SUPPORT (ADDED) --------------------
 extern "C" void wdtISR(void);
 extern "C" void ourISR(void);
 
@@ -44,7 +50,9 @@ const unsigned int CPU_INT_1 = 31;
 
 
 // -------------------- HAPTIC (DRV2605) --------------------
+#ifndef TESTING
 Adafruit_DRV2605 drv;
+#endif
 
 // -------------------- BLE --------------------
 BLEService hapticService("19B10000-E8F2-537E-4F6C-D104768A1214");
@@ -104,15 +112,19 @@ void playHapticEffect(uint8_t effect) {
   Serial.print("Playing haptic effect #");
   Serial.println(effect);
 
+  #ifndef TESTING
   drv.setWaveform(0, effect);  // effect index
   drv.setWaveform(1, 0);       // end of sequence
   drv.go();
+  #endif
 }
 
 void stopHapticEffect() {
+  #ifndef TESTING
   drv.setWaveform(0, 0);
   drv.setWaveform(1, 0);
   drv.go();
+  #endif
 }
 
 // stopHapticEffect(): Stop any ongoing DRV2605 playback.
@@ -144,6 +156,17 @@ bool configureBLEStack() {
 // Side effects: Registers GATT service/characteristic with ArduinoBLE.
 
 bool tryInitializeBLE(HapticFSMState &state) {
+  #ifdef TESTING
+  // Use centralAddress variable to mock tryInitializeBLE behavior in FSM unit test
+  if (state.centralAddress == "") {
+    state.bleInitialized = true;
+    return true;
+  } else {
+    return false;
+  }
+
+  #else
+  
   if (state.bleInitialized) {
     return true;
   }
@@ -159,6 +182,7 @@ bool tryInitializeBLE(HapticFSMState &state) {
   state.bleInitialized = true;
   Serial.println("BLE initialization successful");
   return true;
+  #endif
 }
 
 // tryInitializeBLE(state): Begin ArduinoBLE and configure GATT.
@@ -171,7 +195,9 @@ void ensureAdvertising(HapticFSMState &state) {
     return;
   }
   if (!state.advertising) {
+    #ifndef TESTING
     BLE.advertise();
+    #endif
     state.advertising = true;
     Serial.println("BLE peripheral advertising as UnoR4-Haptic");
   }
@@ -303,23 +329,29 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
 
 // -------------------- ARDUINO LIFECYCLE --------------------
 void setup() {
+  #ifdef TESTING
+  Serial.begin(9600);
+  #else
   Serial.begin(115200);
+  #endif
+
   while (!Serial && millis() < 5000) {
     delay(10);
   }
 
+  #ifdef TESTING
+  testAll();
+  while(true);
+  
+  #else
   // Setting up IRQ on D3
-
   R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS = R_PFS->PORT[D3_PORT].PIN[D3_PIN].PmnPFS & (~R_PFS_PORT_PIN_PmnPFS_ISEL_Msk) | R_PFS_PORT_PIN_PmnPFS_ISEL_Msk;
-
   R_ICU->IRQCR[D3_IRQ] = 1;
-
   R_ICU->IELSR[CPU_INT_1] = 1;
 
-
-   NVIC_SetVector((IRQn_Type) CPU_INT_1, (uint32_t) &ourISR);
-   NVIC_SetPriority((IRQn_Type) CPU_INT_1, 13);
-   NVIC_EnableIRQ((IRQn_Type) CPU_INT_1);
+  NVIC_SetVector((IRQn_Type) CPU_INT_1, (uint32_t) &ourISR);
+  NVIC_SetPriority((IRQn_Type) CPU_INT_1, 13);
+  NVIC_EnableIRQ((IRQn_Type) CPU_INT_1);
 
 
   Serial.println("Setting up BLE + Haptics with FSM...");
@@ -338,6 +370,7 @@ void setup() {
   digitalWrite(WARNING_LED_PIN, LOW);        // WATCHDOG ADDITION
   initWDT();                                 // WATCHDOG ADDITION
   Serial.println("init done");
+  #endif
 }
 
 // setup(): Hardware init and BLE/WDT/DRV setup.
@@ -426,10 +459,10 @@ void initWDT() {
 }
 
 void petWDT() {
-
-
+  #ifndef TESTING
   R_WDT->WDTRR = 0x00;
   R_WDT->WDTRR = 0xFF;
+  #endif
 }
 
 // petWDT(): Refresh watchdog by writing WDTRR sequence.
