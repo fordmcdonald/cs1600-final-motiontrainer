@@ -2,7 +2,11 @@
 #include "Adafruit_DRV2605.h"
 #include <ArduinoBLE.h>
 
-// -------------------- WATCHDOG SUPPORT (ADDED) --------------------
+// setup(): Arduino entry point. Initializes Serial, IRQ on D3, DRV2605, BLE, and watchdog.
+// Inputs: none
+// Outputs: none
+// Side effects: Configures hardware peripherals, starts BLE advertising, primes WDT.
+
 extern "C" void wdtISR(void);
 extern "C" void ourISR(void);
 
@@ -10,11 +14,16 @@ void initWDT();
 void petWDT();
 void updateWarningIndicator();
 
+// initWDT(): Configure RA4M1 WDT (interrupt mode) and enable its NVIC line.
+// Inputs: none
+// Outputs: none
+// Side effects: Sets WDTCR/WDTRCR/WDTSR, maps interrupt, enables NVIC, pets WDT.
+
 constexpr uint8_t WATCHDOG_HEARTBEAT_CMD = 0x48;  // 'H'
 constexpr unsigned long WARNING_BLINK_INTERVAL_MS = 250;
 constexpr int WARNING_LED_PIN = LED_BUILTIN;
-constexpr uint8_t WDT_CLOCK_DIV = 0b1000;   // LOCO/4 ≈ 8.192 kHz
-constexpr uint8_t WDT_TIMEOUT_SEL = 0b11;   // 8192 cycles ≈ 1.0 s at LOCO/4
+constexpr uint8_t WDT_CLOCK_DIV = 0b1000;   // PCLKB/8192 
+constexpr uint8_t WDT_TIMEOUT_SEL = 0b11;   // 16834 cycles 
 
 volatile bool gWatchdogFault = false;
 volatile bool gWatchdogPrimed = false;
@@ -44,6 +53,11 @@ BLECharacteristic hapticChar(
   BLEWrite | BLERead,
   1  // 1 byte command channel
 );
+
+// playHapticEffect(effect): Play a DRV2605 library waveform.
+// Inputs: effect (uint8_t) DRV2605 waveform index.
+// Outputs: none
+// Side effects: Starts haptic motor via DRV2605.
 
 // -------------------- FSM DEFINITIONS --------------------
 enum HapticState {
@@ -101,6 +115,11 @@ void stopHapticEffect() {
   drv.go();
 }
 
+// stopHapticEffect(): Stop any ongoing DRV2605 playback.
+// Inputs: none
+// Outputs: none
+// Side effects: Sends zeroed waveform to DRV2605.
+
 bool configureBLEStack() {
   if (gServiceConfigured) {
     return true;
@@ -118,6 +137,11 @@ bool configureBLEStack() {
   gServiceConfigured = true;
   return true;
 }
+
+// configureBLEStack(): Set local name, service, characteristic and default value.
+// Inputs: none
+// Outputs: bool success
+// Side effects: Registers GATT service/characteristic with ArduinoBLE.
 
 bool tryInitializeBLE(HapticFSMState &state) {
   if (state.bleInitialized) {
@@ -137,6 +161,11 @@ bool tryInitializeBLE(HapticFSMState &state) {
   return true;
 }
 
+// tryInitializeBLE(state): Begin ArduinoBLE and configure GATT.
+// Inputs: state (HapticFSMState&)
+// Outputs: bool indicating initialization success.
+// Side effects: Calls BLE.begin(), configures stack, updates state flag.
+
 void ensureAdvertising(HapticFSMState &state) {
   if (!state.bleInitialized) {
     return;
@@ -147,6 +176,11 @@ void ensureAdvertising(HapticFSMState &state) {
     Serial.println("BLE peripheral advertising as UnoR4-Haptic");
   }
 }
+
+// ensureAdvertising(state): Start BLE advertising if initialized and not already advertising.
+// Inputs: state (HapticFSMState&)
+// Outputs: none
+// Side effects: Calls BLE.advertise() and flips state flag.
 
 void handleConnectionEstablished(HapticFSMState &state, const BLEDevice &central) {
   state.centralConnected = true;
@@ -160,6 +194,11 @@ void handleConnectionEstablished(HapticFSMState &state, const BLEDevice &central
     Serial.println("Connected to central (unknown address)");
   }
 }
+
+// handleConnectionEstablished(state, central): Record connection and log address.
+// Inputs: state (HapticFSMState&), central (BLEDevice)
+// Outputs: none
+// Side effects: Updates connection flags and central address.
 
 void handleDisconnection(HapticFSMState &state) {
   if (state.centralConnected) {
@@ -178,6 +217,11 @@ void handleDisconnection(HapticFSMState &state) {
   state.advertising = false;
   ensureAdvertising(state);
 }
+
+// handleDisconnection(state): Reset connection, stop motor, resume advertising.
+// Inputs: state (HapticFSMState&)
+// Outputs: none
+// Side effects: Stops haptic, clears address/flags, restarts advertising.
 
 // -------------------- FSM UPDATE --------------------
 HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
@@ -252,6 +296,11 @@ HapticFSMState updateFSM(HapticFSMState currState, const HapticInputs &inputs) {
   return ret;
 }
 
+// updateFSM(currState, inputs): Advance FSM based on BLE and threshold events.
+// Inputs: currState (HapticFSMState), inputs (HapticInputs)
+// Outputs: HapticFSMState next state
+// Side effects: May start/stop haptics, advertising, and pet watchdog.
+
 // -------------------- ARDUINO LIFECYCLE --------------------
 void setup() {
   Serial.begin(115200);
@@ -291,6 +340,8 @@ void setup() {
   Serial.println("init done");
 }
 
+// setup(): Hardware init and BLE/WDT/DRV setup.
+
 void loop() {
   if (fsmState.bleInitialized) {
     BLE.poll();
@@ -321,10 +372,10 @@ void loop() {
     Serial.print("Got BLE value: ");
     Serial.println(value);
 
-    if (value == WATCHDOG_HEARTBEAT_CMD) {       // WATCHDOG ADDITION
-      petWDT();                                  // WATCHDOG ADDITION
-      thresholdUpdated = false;                  // WATCHDOG ADDITION
-      thresholdActive = fsmState.thresholdActive;  // WATCHDOG ADDITION
+    if (value == WATCHDOG_HEARTBEAT_CMD) {       
+      petWDT();                                 
+      thresholdUpdated = false;                  
+      thresholdActive = fsmState.thresholdActive;  
     } else {
       thresholdActive = value > 0;
       thresholdUpdated = true;
@@ -345,7 +396,12 @@ void loop() {
   delay(10);
 }
 
-// -------------------- WATCHDOG IMPLEMENTATION --------------------
+// loop(): Main run loop. Poll BLE, read/write GATT char, update FSM, small delay.
+// Inputs: none
+// Outputs: none
+// Side effects: Updates global FSM state and may pet watchdog.
+
+// -------------------- WATCHDOG --------------------
 void initWDT() {
   // Configure Watchdog Timer (interrupt on underflow, ~1.0 s periodd
 
@@ -376,6 +432,11 @@ void petWDT() {
   R_WDT->WDTRR = 0xFF;
 }
 
+// petWDT(): Refresh watchdog by writing WDTRR sequence.
+// Inputs: none
+// Outputs: none
+// Side effects: Prevents watchdog underflow interrupt/reset.
+
 
 extern "C" void ourISR(void) {
 
@@ -396,9 +457,12 @@ extern "C" void ourISR(void) {
 
 }
 
+// ourISR(): Example external IRQ handler on CPU_INT_1.
+// Inputs: none
+// Outputs: none
+// Side effects: Logs, dims LED, clears IRQ flags, halts in loop.
+
 extern "C" void wdtISR(void) {
-  // petWDT(); 
-  // gWatchdogFault = true;
   Serial.println("WOOF");
   while(true) {
     for (int i = 0; i < 256; i+= 10) {
@@ -407,3 +471,8 @@ extern "C" void wdtISR(void) {
     }
   }
 }
+
+// wdtISR(): Watchdog interrupt service routine.
+// Inputs: none
+// Outputs: none
+// Side effects: Logs, pwm-blinks warning LED, halts in loop.
